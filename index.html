@@ -173,8 +173,21 @@ const post = body => fetch(NTFY + "/", { method: "POST", body: JSON.stringify(bo
 // уведомления не критичны: если не ушли, отметка всё равно сохранена
 const notify = n => post({ topic: TOPIC, click: URL_SELF, ...n }).catch(() => {});
 // удаление по sequence_id убирает уведомление с телефонов и отменяет ещё не отправленное
-const unsend = key => fetch(`${NTFY}/${TOPIC}/${seq(key)}`, { method: "DELETE" }).catch(() => {});
-const seq = key => `${key}-${cur().date}`;
+const unsend = (key, date) => fetch(`${NTFY}/${TOPIC}/${seq(key, date)}`, { method: "DELETE" }).catch(() => {});
+const seq = (key, date = cur().date) => `${key}-${date}`;
+
+// Напоминание о разгрузке не привязано к кнопке, поэтому ставим его заранее на сегодня и 2 дня вперёд
+// (ntfy.sh держит отложенные сообщения до 3 дней). ponytail: если 3 дня никто не открывал приложение — напоминаний не будет.
+async function scheduleUnloadReminders() {
+  for (const off of [0, 1, 2]) {
+    const d = new Date(); d.setDate(d.getDate() + off); d.setHours(UNLOAD_BY, 0, 0, 0);
+    const when = +d - 15 * 60e3, date = d.toLocaleDateString("sv");
+    if (when < Date.now() + 60e3 || (off === 0 && cur().unloadedAt)) continue;
+    await unsend("unloadremind", date); // без дублей при повторном открытии
+    await notify({ title: "Через 15 минут срок разгрузки", message: `Посудомойку надо разгрузить до ${UNLOAD_BY}:00.`,
+      tags: ["alarm_clock"], delay: String(Math.floor(when / 1000)), sequence_id: seq("unloadremind", date) });
+  }
+}
 
 function apply(text) { try { const s = JSON.parse(text); if (s && s.date) { state = s; render(); } } catch {} }
 
@@ -204,6 +217,7 @@ async function save(patch, after) {
 
 $("b1").onclick = () => save({ unloadedAt: Date.now(), loadedAt: null }, async c => {
   const d = due(c), remind = Math.floor(d / 1000) - 15 * 60;
+  await unsend("unloadremind");
   await notify({ title: "Посудомойку разгрузили", message: `Загрузи до ${hm(d)}. Таймер пошёл.`, tags: ["white_check_mark"], sequence_id: seq("unload") });
   if (remind * 1000 > Date.now() + 60e3)
     await notify({ title: "Через 15 минут срок загрузки", message: "Посудомойка ждёт загрузки.", tags: ["alarm_clock"], delay: String(remind), sequence_id: seq("remind") });
@@ -211,6 +225,7 @@ $("b1").onclick = () => save({ unloadedAt: Date.now(), loadedAt: null }, async c
 $("u1").onclick = () => save({ unloadedAt: null }, async () => {
   await unsend("unload"); await unsend("remind");
   await notify({ title: "Отбой", message: "Посудомойку ещё не разгрузили, отметку отменили.", tags: ["x"] });
+  await scheduleUnloadReminders();
 });
 $("b2").onclick = () => save({ loadedAt: Date.now() }, async () => {
   await unsend("remind");
@@ -228,7 +243,7 @@ $("copy").onclick = async () => {
 };
 
 render();
-load();
+load().then(scheduleUnloadReminders);
 setInterval(render, 1000);
 try { new EventSource(`${NTFY}/${STATE}/sse`).onmessage = e => { const m = JSON.parse(e.data); if (m.event === "message") apply(m.message); }; } catch {}
 document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
