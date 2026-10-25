@@ -80,6 +80,11 @@ summary { cursor: pointer; }
 .day .chips { margin-top: 0; align-items: center; }
 .day .chips select { flex: 1 1 9em; width: auto; }
 .cats { display: grid; gap: 24px; }
+.cat-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-tabs button::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 99px; background: var(--c); }
+.cat-tabs button[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 45%, var(--paper)); border-color: var(--ink); }
+.cat-tabs small { opacity: .55; }
+.chips span.tinted { background: color-mix(in srgb, var(--c) 22%, var(--paper)); border-color: color-mix(in srgb, var(--c) 65%, var(--paper)); }
 .cat { display: grid; gap: 10px; }
 .cat .chips, .cat .add { margin-top: 0; }
 #addCat { margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--sand); }
@@ -87,7 +92,6 @@ summary { cursor: pointer; }
 #who .chips, #who .add { margin-top: 0; }
 button.linkbtn { background: none; border: 0; padding: 0; font: inherit; letter-spacing: 0; text-transform: none; color: var(--ink);
   text-decoration: underline; text-underline-offset: 3px; }
-.cat-name { margin: 0; font-weight: 400; letter-spacing: .06em; }
 [hidden] { display: none !important; }
 #msg { max-width: 440px; margin: 16px auto 0; }
 
@@ -193,6 +197,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
 
   <section>
     <p class="label">Список блюд</p>
+    <div class="cat-tabs" id="catTabs"></div>
     <div class="cats" id="cats"></div>
     <form class="add" id="addCat">
       <input id="catInput" maxlength="30" placeholder="Новая категория" aria-label="Новая категория">
@@ -266,6 +271,7 @@ function render() {
     $("n2").textContent = left < 0 ? `Просрочено, надо было до ${hm(due(c))}.` : `Загрузить до ${hm(due(c))}.`;
   }
   $("g2").style.width = fill * 100 + "%";
+  $("g2").parentElement.hidden = !c.unloadedAt; // пустая шкала до разгрузки выглядит как лишняя линия
   $("b2").hidden = !!c.loadedAt; $("b2").disabled = busy || !c.unloadedAt;
   $("u2").hidden = !c.loadedAt; $("u2").disabled = busy;
 }
@@ -357,18 +363,25 @@ function setMe(n) {
   try { me ? localStorage.setItem(NAME_KEY, me) : localStorage.removeItem(NAME_KEY); } catch {}
   renderMenu();
 }
-// пока меню ни разу не сохраняли, показываем стартовый список
-let menu = cleanMenu({ cats: [
-  { name: "Супы", dishes: ["Борщ", "Щи", "Зелёный (брокколи и цв. капуста)", "Тыквенный", "Грибной", "Грибной пюре", "Фасолевый",
-    "Чечевичный", "Картофельный", "Бульон", "Шурпа", "С шариками", "Фунчозный", "Гороховый", "Мисо", "Том ям"] },
-] });
+// список блюд живёт в базе; до её ответа меню пустое
+let menu = cleanMenu({});
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+// какую категорию списка блюд показывать — у каждого телефона своя
+const CAT_KEY = "posuda-cat";
+let openCat = ""; try { openCat = localStorage.getItem(CAT_KEY) || ""; } catch {}
+function showCat(name) { openCat = name; try { localStorage.setItem(CAT_KEY, name); } catch {} renderMenu(); }
 const findDish = name => menu.cats.find(c => c.dishes.some(d => d.toLowerCase() === name.toLowerCase()));
 
-function chip(text, onRemove, note) {
+// цвет категории по её месту в списке: приглушённые землистые тона в тон бумаге и чернилам
+const CAT_COLORS = ["#c9a24f", "#b97c5f", "#87986a", "#7b94a6", "#9b7b92", "#6f978e", "#a8916f"];
+const catColor = ci => ci < 0 ? "" : CAT_COLORS[ci % CAT_COLORS.length];
+const dishColor = d => catColor(menu.cats.indexOf(findDish(d)));
+
+function chip(text, onRemove, note, color) {
   const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.ariaLabel = "Убрать " + text;
   x.onclick = onRemove;
   const c = document.createElement("span"); c.append(text);
+  if (color) { c.className = "tinted"; c.style.setProperty("--c", color); }
   if (note) c.append(el("small", { textContent: note }));
   c.append(x);
   return c;
@@ -387,19 +400,28 @@ function renderMenu() {
     }
     sel.onchange = () => { if (sel.value) setDay(k, [...chosen, { d: sel.value, by: me }]); };
     const cell = document.createElement("div"); cell.className = "chips";
-    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by)), sel);
+    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), sel);
     const lab = document.createElement("label"); lab.htmlFor = sel.id; lab.textContent = name;
     const row = document.createElement("div"); row.className = "day" + (i === t ? " today" : ""); row.append(lab, cell);
     return row;
   }));
   const setCat = (ci, patch) => saveMenu({ cats: menu.cats.map((c, j) => j === ci ? { ...c, ...patch } : c) });
-  $("cats").replaceChildren(...menu.cats.map((c, ci) => {
-    const head = el("div", { className: "row" }, el("p", { className: "cat-name", textContent: c.name }));
+  // видна одна категория — та, что выбрана кнопкой сверху
+  const sel = Math.max(0, menu.cats.findIndex(c => c.name === openCat));
+  $("catTabs").replaceChildren(...menu.cats.map((c, ci) => {
+    const b = el("button", { type: "button", className: "chip", ariaPressed: String(ci === sel) }, c.name, el("small", { textContent: " " + c.dishes.length }));
+    b.style.setProperty("--c", catColor(ci));
+    b.onclick = () => showCat(c.name);
+    return b;
+  }));
+  $("cats").replaceChildren(...menu.cats.flatMap((c, ci) => {
+    if (ci !== sel) return [];
+    const head = el("div", { className: "row" });
     // удалить можно только пустую категорию, чтобы не потерять блюда одним нажатием
     if (!c.dishes.length) {
-      const del = el("button", { type: "button", className: "chip", textContent: "Удалить" });
+      const del = el("button", { type: "button", className: "chip", textContent: "Удалить категорию" });
       del.onclick = () => saveMenu({ cats: menu.cats.filter((_, j) => j !== ci) });
-      head.append(del);
+      head.append(el("p", { className: "note", textContent: "Пока пусто." }), del);
     }
     const input = el("input", { id: "add-" + ci, maxLength: 40, placeholder: "Добавить блюдо", ariaLabel: "Новое блюдо: " + c.name });
     input.oninput = () => input.setCustomValidity("");
@@ -412,8 +434,8 @@ function renderMenu() {
       setCat(ci, { dishes: [...c.dishes, v] });
       $("add-" + ci).focus();
     };
-    const chips = el("div", { className: "chips" }, ...c.dishes.map(d => chip(d, () => setCat(ci, { dishes: c.dishes.filter(n => n !== d) }))));
-    return el("div", { className: "cat" }, head, chips, form);
+    const chips = el("div", { className: "chips" }, ...c.dishes.map(d => chip(d, () => setCat(ci, { dishes: c.dishes.filter(n => n !== d) }), "", catColor(ci))));
+    return el("div", { className: "cat" }, ...(c.dishes.length ? [] : [head]), chips, form);
   }));
   $("clearWeek").disabled = !Object.values(menu.week).some(l => l.length);
 
@@ -438,7 +460,7 @@ $("addCat").onsubmit = e => {
   e.preventDefault();
   const v = $("catInput").value.trim().slice(0, 30);
   $("catInput").value = "";
-  if (v && !menu.cats.some(c => c.name.toLowerCase() === v.toLowerCase())) saveMenu({ cats: [...menu.cats, { name: v, dishes: [] }] });
+  if (v && !menu.cats.some(c => c.name.toLowerCase() === v.toLowerCase())) { openCat = v; saveMenu({ cats: [...menu.cats, { name: v, dishes: [] }] }); }
 };
 $("clearWeek").onclick = () => saveMenu({ week: Object.fromEntries(DAYS.map(([k]) => [k, []])) });
 
