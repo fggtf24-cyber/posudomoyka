@@ -79,7 +79,7 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
   </div>
 
   <section id="s1">
-    <div class="row"><p class="label">1 · Разгрузить</p><span class="by">до 18:00</span></div>
+    <div class="row"><p class="label">1 · Разгрузить</p><span class="by">до 17:00</span></div>
     <div class="big" id="t1">—</div>
     <p class="note" id="n1">Загружаем…</p>
     <button id="b1">Я разгрузил</button>
@@ -117,7 +117,7 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
 <script>
 // ponytail: тема лежит в публичном коде, любой, кто её прочтёт, может слать в неё сообщения. Для посудомойки норм; если начнут баловаться — свой ntfy-сервер с паролем.
 const TOPIC = "posuda-978f310f6fe058ed", STATE = TOPIC + "-state", NTFY = "https://ntfy.sh";
-const UNLOAD_BY = 18, LOAD_BY = 20, WINDOW = 2 * 3600e3;
+const UNLOAD_BY = 17, LOAD_BY = 20, WINDOW = 2 * 3600e3;
 const URL_SELF = location.origin + location.pathname;
 const $ = id => document.getElementById(id);
 let state = {}, busy = false;
@@ -144,7 +144,7 @@ function render() {
   } else {
     const left = at(UNLOAD_BY) - now;
     $("t1").textContent = (left < 0 ? "−" : "") + dur(left);
-    $("n1").textContent = left < 0 ? "Просрочено. Разгрузите как можно скорее." : "Осталось до 18:00.";
+    $("n1").textContent = left < 0 ? "Просрочено. Разгрузите как можно скорее." : `Осталось до ${UNLOAD_BY}:00.`;
   }
   $("b1").hidden = !!c.unloadedAt; $("b1").disabled = busy;
   $("u1").hidden = !c.unloadedAt || !!c.loadedAt; $("u1").disabled = busy;
