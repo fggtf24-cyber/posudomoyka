@@ -1,8 +1,13 @@
 {
+  "id": "./",
   "name": "Посудомойка",
   "short_name": "Посудомойка",
+  "description": "Посудомойка и меню на неделю для всей семьи",
+  "lang": "ru",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f6f4ee",
   "theme_color": "#f6f4ee",
   "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
