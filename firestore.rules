@@ -1,0 +1,19 @@
+rules_version = '2';
+// Входа в приложении нет: читать и менять может любой, у кого есть ссылка,
+// но только эти два документа, только нужные поля и без удаления.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /app/dishwasher {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['date', 'unloadedAt', 'loadedAt'])
+                   && request.resource.data.date is string;
+    }
+    match /app/menu {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['week', 'cats'])
+                   && request.resource.data.week is map
+                   && request.resource.data.cats is list
+                   && request.resource.data.cats.size() <= 30;
+    }
+  }
+}

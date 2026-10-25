@@ -58,11 +58,62 @@ a { color: var(--ink); text-underline-offset: 3px; }
 ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--ink2); }
 code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; border-radius: 99px; word-break: break-all; }
 #msg { margin: 0; padding: 10px 14px; border: 1px solid var(--ink); border-radius: 12px; }
-@media (prefers-reduced-motion: reduce) { .gauge i { transition: none; } }
+
+.week { display: grid; }
+.day { display: grid; grid-template-columns: 3em 1fr; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--sand); }
+.day:last-child { border-bottom: 0; }
+.day label { font-size: .78rem; letter-spacing: .2em; text-transform: uppercase; color: var(--grey); }
+.day.today label { color: var(--ink); font-weight: 500; }
+select, input { font: 300 1rem var(--font); color: var(--ink); background: var(--paper); border: 1px solid var(--stone); border-radius: 99px; padding: 8px 14px; width: 100%; min-width: 0; }
+.day.today select { border-color: var(--ink); }
+select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+summary { cursor: pointer; }
+.add { display: flex; gap: 8px; margin-top: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chips span { display: inline-flex; align-items: center; padding: 3px 2px 3px 14px; border: 1px solid var(--stone); border-radius: 99px; font-size: .9rem; }
+.chips button { background: none; border: 0; color: var(--grey); padding: 0 10px; font-size: 1rem; letter-spacing: 0; }
+.day .chips { margin-top: 0; align-items: center; }
+.day .chips select { flex: 1 1 9em; width: auto; }
+.cats { display: grid; gap: 24px; }
+.cat { display: grid; gap: 10px; }
+.cat .chips, .cat .add { margin-top: 0; }
+#addCat { margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--sand); }
+.chips span small { margin-left: 6px; color: var(--grey); font-size: .74rem; letter-spacing: .04em; }
+#who .chips, #who .add { margin-top: 0; }
+button.linkbtn { background: none; border: 0; padding: 0; font: inherit; letter-spacing: 0; text-transform: none; color: var(--ink);
+  text-decoration: underline; text-underline-offset: 3px; }
+.cat-name { margin: 0; font-weight: 400; letter-spacing: .06em; }
+[hidden] { display: none !important; }
+#msg { max-width: 440px; margin: 16px auto 0; }
+
+/* Нижняя панель: чернильная полоса, активная вкладка поднята в круг цвета песка в вырезе цвета бумаги */
+:root { --bar-h: 68px; --ease: cubic-bezier(.3, .7, .3, 1); }
+main { padding-bottom: calc(var(--bar-h) + 56px); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; max-width: 520px; margin: 0 auto; display: flex;
+  height: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--ink); border-radius: 24px 24px 0 0; }
+.tab { flex: 1; position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  background: none; border: 0; border-radius: 0; padding: 0; color: var(--stone); font-size: .62rem; letter-spacing: .24em; }
+.tab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .35s var(--ease); }
+.tab[aria-selected="true"] { color: var(--paper); }
+.tab[aria-selected="true"] svg { color: var(--ink); transform: translateY(-24px); }
+.tab:focus-visible { outline: none; }
+.tab:focus-visible span { text-decoration: underline; text-underline-offset: 4px; }
+/* содержимое растворяется над панелью и не лезет под поднятую кнопку */
+.tabbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 44px; pointer-events: none;
+  background: linear-gradient(rgba(246, 244, 238, 0), var(--paper) 80%); }
+.ind { position: absolute; top: 0; left: 0; width: 50%; z-index: 1; pointer-events: none; transition: transform .35s var(--ease); }
+.ind > i { position: absolute; left: 50%; top: 0; }
+/* вырез: круг r=36 вокруг кнопки и «плечи» r=14, касающиеся круга (центры плеч на ±48.54, 14) */
+.cut { position: absolute; left: 50%; top: -34px; width: 100px; height: 74px; margin-left: -50px; overflow: visible; fill: var(--paper); }
+.fab { top: -28px !important; width: 60px; height: 60px; margin-left: -30px; background: var(--sand); border: 1.5px solid var(--ink); border-radius: 99px; }
+@media (prefers-reduced-motion: reduce) { .gauge i, .tab svg, .ind { transition: none; } }
 </style>
 </head>
 <body>
-<main>
+<p id="msg" hidden></p>
+<main id="p0" role="tabpanel" aria-label="Посудомойка">
   <header>
     <h1>Посудомойка</h1>
     <p class="sub">разгрузить · загрузить</p>
@@ -95,8 +146,6 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
     <button class="ghost" id="u2" hidden>Нажал случайно — отменить</button>
   </section>
 
-  <p id="msg" hidden></p>
-
   <section>
     <p class="label">Уведомления</p>
     <ol>
@@ -114,9 +163,57 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
   </section>
 </main>
 
+<main id="p1" role="tabpanel" aria-label="Меню" hidden>
+  <header>
+    <h1>Меню</h1>
+    <p class="sub">на неделю</p>
+    <p class="date" id="meLine" hidden>Вы — <span id="meName"></span> · <button class="linkbtn" id="changeName">сменить</button></p>
+    <div class="dash"></div>
+  </header>
+
+  <section id="who" hidden>
+    <p class="label">Как вас зовут?</p>
+    <p class="note">Имя будет видно рядом с блюдами, которые вы выберете. Телефон его запомнит.</p>
+    <div class="chips" id="names"></div>
+    <form class="add" id="nameForm">
+      <input id="nameInput" maxlength="20" placeholder="Ваше имя" aria-label="Ваше имя" autocomplete="given-name">
+      <button class="chip" type="submit">Готово</button>
+    </form>
+  </section>
+
+  <section>
+    <div class="row"><p class="label">Неделя</p><button class="chip" id="clearWeek">Очистить</button></div>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section>
+    <p class="label">Список блюд</p>
+    <div class="cats" id="cats"></div>
+    <form class="add" id="addCat">
+      <input id="catInput" maxlength="30" placeholder="Новая категория" aria-label="Новая категория">
+      <button class="chip" type="submit">Добавить</button>
+    </form>
+  </section>
+</main>
+
+<nav class="tabbar" role="tablist" aria-label="Разделы">
+  <div class="ind" id="ind"><svg class="cut" viewBox="-50 -34 100 74" aria-hidden="true"><circle cx="0" cy="2" r="36"/><path d="M-48.54 0A14 14 0 0 1-34.95 10.64A36 36 0 0 0 34.95 10.64A14 14 0 0 1 48.54 0Z"/></svg><i class="fab"></i></div>
+  <button class="tab" role="tab" aria-controls="p0"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M4 8h16M7.5 5.5h.01"/><circle cx="12" cy="14.5" r="3.5"/></svg><span>ПОСУДА</span></button>
+  <button class="tab" role="tab" aria-controls="p1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v5a2 2 0 0 0 4 0V3M7 3v18M17 21V3c-2 1.5-3 4-3 7v3h3"/></svg><span>МЕНЮ</span></button>
+</nav>
+
 <script>
 // ponytail: тема лежит в публичном коде, любой, кто её прочтёт, может слать в неё сообщения. Для посудомойки норм; если начнут баловаться — свой ntfy-сервер с паролем.
-const TOPIC = "posuda-978f310f6fe058ed", STATE = TOPIC + "-state", NTFY = "https://ntfy.sh";
+const TOPIC = "posuda-978f310f6fe058ed", NTFY = "https://ntfy.sh";
+// Отметки и меню лежат в Firestore. Ключи веб-приложения Firebase публичные по задумке, доступ ограничивают правила из firestore.rules.
+const FIREBASE = {
+  apiKey: "AIzaSyCVaEYmgJRPpNAxb0jjDhFiF0Mfe5sh-Nc",
+  authDomain: "menumoyka.firebaseapp.com",
+  projectId: "menumoyka",
+  storageBucket: "menumoyka.firebasestorage.app",
+  messagingSenderId: "130024335446",
+  appId: "1:130024335446:web:0d3eb3993e83228392f3f7",
+};
 const UNLOAD_BY = 17, LOAD_BY = 20, WINDOW = 2 * 3600e3;
 const URL_SELF = location.origin + location.pathname;
 const $ = id => document.getElementById(id);
@@ -189,18 +286,16 @@ async function scheduleUnloadReminders() {
   }
 }
 
-function apply(text) { try { const s = JSON.parse(text); if (s && s.date) { state = s; render(); } } catch {} }
-
-// ntfy хранит сообщения 12 часов — этого хватает на один день
-async function load() {
-  try {
-    const r = await fetch(`${NTFY}/${STATE}/json?poll=1&since=12h`);
-    const lines = (await r.text()).trim().split("\n").filter(Boolean);
-    if (lines.length) apply(JSON.parse(lines.at(-1)).message);
-    $("msg").hidden = true;
-  } catch { showErr("Нет связи. Проверьте интернет."); }
-  render();
-}
+const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
+const fb = (async () => {
+  const [{ initializeApp }, fs] = await Promise.all([import(FB + "firebase-app.js"), import(FB + "firebase-firestore.js")]);
+  // кэш на телефоне: приложение открывается сразу с последним известным состоянием, даже без сети
+  const db = fs.initializeFirestore(initializeApp(FIREBASE), { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+  return { ref: id => fs.doc(db, "app", id), set: fs.setDoc, watch: fs.onSnapshot };
+})();
+// без сети Firestore держит запись в очереди и отправит сам, но ждать этого кнопкой не будем
+const write = async (id, data) => { const f = await fb;
+  await Promise.race([f.set(f.ref(id), data), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000))]); };
 
 function showErr(t) { $("msg").textContent = t; $("msg").hidden = false; }
 
@@ -208,10 +303,10 @@ async function save(patch, after) {
   busy = true; render();
   const next = { ...cur(), ...patch };
   try {
-    await post({ topic: STATE, message: JSON.stringify(next) });
+    await write("dishwasher", next);
     state = next; $("msg").hidden = true;
     await after?.(next);
-  } catch { showErr("Не удалось сохранить. Проверьте интернет и нажмите ещё раз."); }
+  } catch { showErr("Нет связи с базой. Отметка сохранится, когда появится интернет, но уведомления не ушли."); }
   busy = false; render();
 }
 
@@ -236,17 +331,147 @@ $("u2").onclick = () => save({ loadedAt: null }, async () => {
   await notify({ title: "Отбой", message: "Посудомойку ещё не загрузили, отметку отменили.", tags: ["x"] });
 });
 
+// Меню на неделю: на каждый день можно выбрать несколько блюд, видно всем.
+const DAYS = [["mon", "Пн"], ["tue", "Вт"], ["wed", "Ср"], ["thu", "Чт"], ["fri", "Пт"], ["sat", "Сб"], ["sun", "Вс"]];
+// писать в базу может любой с приложением — берём только строки нужной формы
+function cleanMenu(m) {
+  if (!m || typeof m !== "object") return null;
+  const str = v => typeof v === "string" ? v.trim().slice(0, 40) : "";
+  const list = v => [...new Set((Array.isArray(v) ? v : [v]).map(str).filter(Boolean))];
+  const cats = (Array.isArray(m.cats) ? m.cats : []).map(c => ({ name: str(c?.name).slice(0, 30), dishes: list(c?.dishes).slice(0, 100) }));
+  // день — список {d: блюдо, by: кто выбрал}
+  const picks = v => (Array.isArray(v) ? v : []).map(p => ({ d: str(p?.d), by: str(p?.by).slice(0, 20) }))
+    .filter((p, i, a) => p.d && a.findIndex(q => q.d === p.d) === i).slice(0, 8);
+  return { week: Object.fromEntries(DAYS.map(([k]) => [k, picks(m.week?.[k])])), cats: cats.filter(c => c.name).slice(0, 30) };
+}
+// ponytail: имя просто запоминается на телефоне, без пароля — назваться можно кем угодно. Нужна защита — вход по почте через Firebase Auth.
+const NAME_KEY = "posuda-name";
+let me = ""; try { me = localStorage.getItem(NAME_KEY) || ""; } catch {}
+function setMe(n) {
+  me = n.trim().slice(0, 20);
+  try { me ? localStorage.setItem(NAME_KEY, me) : localStorage.removeItem(NAME_KEY); } catch {}
+  renderMenu();
+}
+// пока меню ни разу не сохраняли, показываем стартовый список
+let menu = cleanMenu({ cats: [
+  { name: "Супы", dishes: ["Борщ", "Щи", "Зелёный (брокколи и цв. капуста)", "Тыквенный", "Грибной", "Грибной пюре", "Фасолевый",
+    "Чечевичный", "Картофельный", "Бульон", "Шурпа", "С шариками", "Фунчозный", "Гороховый", "Мисо", "Том ям"] },
+] });
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const findDish = name => menu.cats.find(c => c.dishes.some(d => d.toLowerCase() === name.toLowerCase()));
+
+function chip(text, onRemove, note) {
+  const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.ariaLabel = "Убрать " + text;
+  x.onclick = onRemove;
+  const c = document.createElement("span"); c.append(text);
+  if (note) c.append(el("small", { textContent: note }));
+  c.append(x);
+  return c;
+}
+
+function renderMenu() {
+  const t = (new Date().getDay() + 6) % 7;
+  const setDay = (k, list) => saveMenu({ week: { ...menu.week, [k]: list } });
+  $("week").replaceChildren(...DAYS.map(([k, name], i) => {
+    const chosen = menu.week[k];
+    // выбирать можно, только представившись
+    const sel = el("select", { id: "m-" + k, disabled: !me }, new Option(chosen.length ? "+ ещё блюдо" : "—", ""));
+    for (const c of menu.cats) {
+      const left = c.dishes.filter(d => !chosen.some(p => p.d === d));
+      if (left.length) sel.append(el("optgroup", { label: c.name }, ...left.map(d => new Option(d, d))));
+    }
+    sel.onchange = () => { if (sel.value) setDay(k, [...chosen, { d: sel.value, by: me }]); };
+    const cell = document.createElement("div"); cell.className = "chips";
+    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by)), sel);
+    const lab = document.createElement("label"); lab.htmlFor = sel.id; lab.textContent = name;
+    const row = document.createElement("div"); row.className = "day" + (i === t ? " today" : ""); row.append(lab, cell);
+    return row;
+  }));
+  const setCat = (ci, patch) => saveMenu({ cats: menu.cats.map((c, j) => j === ci ? { ...c, ...patch } : c) });
+  $("cats").replaceChildren(...menu.cats.map((c, ci) => {
+    const head = el("div", { className: "row" }, el("p", { className: "cat-name", textContent: c.name }));
+    // удалить можно только пустую категорию, чтобы не потерять блюда одним нажатием
+    if (!c.dishes.length) {
+      const del = el("button", { type: "button", className: "chip", textContent: "Удалить" });
+      del.onclick = () => saveMenu({ cats: menu.cats.filter((_, j) => j !== ci) });
+      head.append(del);
+    }
+    const input = el("input", { id: "add-" + ci, maxLength: 40, placeholder: "Добавить блюдо", ariaLabel: "Новое блюдо: " + c.name });
+    input.oninput = () => input.setCustomValidity("");
+    const form = el("form", { className: "add" }, input, el("button", { className: "chip", type: "submit", textContent: "Добавить" }));
+    form.onsubmit = e => {
+      e.preventDefault();
+      const v = input.value.trim().slice(0, 40), dup = v && findDish(v);
+      if (dup) { input.setCustomValidity(`Такое блюдо уже есть в «${dup.name}»`); return input.reportValidity(); }
+      if (!v) return;
+      setCat(ci, { dishes: [...c.dishes, v] });
+      $("add-" + ci).focus();
+    };
+    const chips = el("div", { className: "chips" }, ...c.dishes.map(d => chip(d, () => setCat(ci, { dishes: c.dishes.filter(n => n !== d) }))));
+    return el("div", { className: "cat" }, head, chips, form);
+  }));
+  $("clearWeek").disabled = !Object.values(menu.week).some(l => l.length);
+
+  $("who").hidden = !!me; $("meLine").hidden = !me; $("meName").textContent = me;
+  // имена, которые уже встречаются в меню, — чтобы на втором телефоне не набирать заново
+  const known = [...new Set(Object.values(menu.week).flat().map(p => p.by).filter(Boolean))];
+  $("names").replaceChildren(...known.map(n => {
+    const b = el("button", { type: "button", className: "chip", textContent: n });
+    b.onclick = () => setMe(n);
+    return b;
+  }));
+}
+
+function saveMenu(patch) {
+  menu = { ...menu, ...patch }; renderMenu();
+  write("menu", menu).then(() => $("msg").hidden = true, () => showErr("Нет связи с базой. Меню сохранится, когда появится интернет."));
+}
+
+$("nameForm").onsubmit = e => { e.preventDefault(); if ($("nameInput").value.trim()) setMe($("nameInput").value); };
+$("changeName").onclick = () => { $("nameInput").value = me; setMe(""); $("nameInput").focus(); };
+$("addCat").onsubmit = e => {
+  e.preventDefault();
+  const v = $("catInput").value.trim().slice(0, 30);
+  $("catInput").value = "";
+  if (v && !menu.cats.some(c => c.name.toLowerCase() === v.toLowerCase())) saveMenu({ cats: [...menu.cats, { name: v, dishes: [] }] });
+};
+$("clearWeek").onclick = () => saveMenu({ week: Object.fromEntries(DAYS.map(([k]) => [k, []])) });
+
+renderMenu();
+
 $("topic").textContent = TOPIC;
 $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText(TOPIC); $("copy").textContent = "Скопировано"; }
   catch { getSelection().selectAllChildren($("topic")); }
 };
 
+// вкладки: #menu в адресе открывает меню сразу (удобно для закладки)
+const tabs = [...document.querySelectorAll(".tab")];
+function showTab(i) {
+  tabs.forEach((t, j) => t.setAttribute("aria-selected", j === i));
+  $("p0").hidden = i !== 0; $("p1").hidden = i !== 1;
+  $("ind").style.transform = `translateX(${i * 100}%)`;
+  history.replaceState(null, "", i ? "#menu" : location.pathname + location.search);
+}
+tabs.forEach((t, i) => t.onclick = () => { showTab(i); scrollTo(0, 0); });
+const tabFromHash = () => showTab(location.hash === "#menu" ? 1 : 0);
+tabFromHash();
+addEventListener("hashchange", tabFromHash);
+
 render();
-load().then(scheduleUnloadReminders);
 setInterval(render, 1000);
-try { new EventSource(`${NTFY}/${STATE}/sse`).onmessage = e => { const m = JSON.parse(e.data); if (m.event === "message") apply(m.message); }; } catch {}
-document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+let scheduled = false;
+const lost = () => showErr("Нет связи с базой. Проверьте интернет и откройте приложение заново.");
+fb.then(f => {
+  f.watch(f.ref("dishwasher"), { includeMetadataChanges: true }, s => {
+    const d = s.data();
+    if (d && typeof d.date === "string") state = d;
+    render();
+    // напоминания ставим, только когда знаем свежее состояние с сервера, а не из кэша
+    if (!s.metadata.fromCache) { $("msg").hidden = true; if (!scheduled) { scheduled = true; scheduleUnloadReminders(); } }
+  }, lost);
+  f.watch(f.ref("menu"), s => { const m = cleanMenu(s.data()); if (m) { menu = m; renderMenu(); } }, lost);
+}).catch(lost);
 </script>
 </body>
 </html>
