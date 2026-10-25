@@ -1,0 +1,9 @@
+{
+  "name": "Посудомойка",
+  "short_name": "Посудомойка",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f4ee",
+  "theme_color": "#f6f4ee",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}
