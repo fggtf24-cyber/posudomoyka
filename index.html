@@ -21,7 +21,7 @@
 html { background: var(--paper); }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 300 16px/1.55 var(--font);
   padding: env(safe-area-inset-top, 0px) max(20px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(20px, env(safe-area-inset-left, 0px)); }
-main { max-width: 440px; margin: 0 auto; padding-block: 20px 48px; display: grid; gap: 20px; }
+main { max-width: 440px; margin: 0 auto; padding-block: 20px 48px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 
 h1 { font-weight: 400; font-size: 1.8rem; line-height: 1.1; letter-spacing: .04em; margin: 0; }
 .sub { font-size: .72rem; letter-spacing: .32em; text-transform: uppercase; color: var(--ink2); margin: 6px 0 0; }
@@ -60,12 +60,12 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
 #msg { margin: 0; padding: 10px 14px; border: 1px solid var(--ink); border-radius: 12px; }
 
 .week { display: grid; }
-.day { display: grid; grid-template-columns: 2.4em 1fr; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--sand); }
+.day { display: grid; grid-template-columns: 2.4em minmax(0, 1fr); align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--sand); }
 .day:last-child { border-bottom: 0; }
 .day label { font-size: .78rem; letter-spacing: .2em; text-transform: uppercase; color: var(--grey); }
 .day.today label { color: var(--ink); font-weight: 500; }
 select, input { font: 300 1rem var(--font); color: var(--ink); background: var(--paper); border: 1px solid var(--stone); border-radius: 99px; padding: 6px 12px; width: 100%; min-width: 0; }
-.day.today select { border-color: var(--ink); }
+.day.today input { border-color: var(--ink); }
 select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 summary { cursor: pointer; }
 .setup summary { display: flex; justify-content: space-between; list-style: none; }
@@ -78,7 +78,8 @@ summary { cursor: pointer; }
 .chips span { display: inline-flex; align-items: center; padding: 3px 2px 3px 14px; border: 1px solid var(--stone); border-radius: 99px; font-size: .9rem; }
 .chips button { background: none; border: 0; color: var(--grey); padding: 0 10px; font-size: 1rem; letter-spacing: 0; }
 .day .chips { margin-top: 0; align-items: center; }
-.day .chips select { flex: 1 1 9em; width: auto; }
+.day .chips input { flex: 1 1 9em; width: 0; }
+.past-toggle { justify-self: start; padding: 6px 0; color: var(--grey); font-size: .9rem; }
 .cats { display: grid; gap: 24px; }
 .cat-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .cat-tabs button::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 99px; background: var(--c); }
@@ -193,6 +194,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   <section>
     <div class="row"><p class="label">Неделя</p><button class="chip" id="clearWeek">Очистить</button></div>
     <div class="week" id="week"></div>
+    <datalist id="dishOptions"></datalist>
   </section>
 
   <section>
@@ -353,8 +355,13 @@ function cleanMenu(m) {
   // день — список {d: блюдо, by: кто выбрал}
   const picks = v => (Array.isArray(v) ? v : []).map(p => ({ d: str(p?.d), by: str(p?.by).slice(0, 20) }))
     .filter((p, i, a) => p.d && a.findIndex(q => q.d === p.d) === i).slice(0, 8);
-  return { week: Object.fromEntries(DAYS.map(([k]) => [k, picks(m.week?.[k])])), cats: cats.filter(c => c.name).slice(0, 30) };
+  // weekOf — понедельник недели, к которой относятся выборы; лежит внутри week, чтобы не менять правила базы.
+  // Нет пометки (данные до автоочистки) — считаем текущей неделей.
+  return { week: Object.fromEntries(DAYS.map(([k]) => [k, picks(m.week?.[k])])), cats: cats.filter(c => c.name).slice(0, 30),
+    weekOf: str(m.week?.weekOf) || mondayOf() };
 }
+const mondayOf = () => { const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.toLocaleDateString("sv"); };
+const emptyWeek = () => Object.fromEntries(DAYS.map(([k]) => [k, []]));
 // ponytail: имя просто запоминается на телефоне, без пароля — назваться можно кем угодно. Нужна защита — вход по почте через Firebase Auth.
 const NAME_KEY = "posuda-name";
 let me = ""; try { me = localStorage.getItem(NAME_KEY) || ""; } catch {}
@@ -387,24 +394,41 @@ function chip(text, onRemove, note, color) {
   return c;
 }
 
+let showPast = false;
 function renderMenu() {
+  // началась новая неделя — старые выборы не показываем, база перезапишется при первом выборе
+  if (menu.weekOf !== mondayOf()) menu = { ...menu, week: emptyWeek(), weekOf: mondayOf() };
   const t = (new Date().getDay() + 6) % 7;
   const setDay = (k, list) => saveMenu({ week: { ...menu.week, [k]: list } });
-  $("week").replaceChildren(...DAYS.map(([k, name], i) => {
+  // подсказки поиска: все блюда, подписанные категорией
+  $("dishOptions").replaceChildren(...menu.cats.flatMap(c => c.dishes.map(d => el("option", { value: d, label: c.name }))));
+  const rows = DAYS.map(([k, name], i) => {
     const chosen = menu.week[k];
+    const add = v => {
+      const d = (findDish(v)?.dishes.find(x => x.toLowerCase() === v.trim().toLowerCase()) || v.trim()).slice(0, 40);
+      if (!d || chosen.some(p => p.d.toLowerCase() === d.toLowerCase())) return;
+      setDay(k, [...chosen, { d, by: me }]);
+      $("m-" + k).focus(); // клавиатура остаётся открытой для следующего блюда
+    };
     // выбирать можно, только представившись
-    const sel = el("select", { id: "m-" + k, disabled: !me }, new Option(chosen.length ? "+ ещё блюдо" : "—", ""));
-    for (const c of menu.cats) {
-      const left = c.dishes.filter(d => !chosen.some(p => p.d === d));
-      if (left.length) sel.append(el("optgroup", { label: c.name }, ...left.map(d => new Option(d, d))));
-    }
-    sel.onchange = () => { if (sel.value) setDay(k, [...chosen, { d: sel.value, by: me }]); };
+    const input = el("input", { id: "m-" + k, disabled: !me, autocomplete: "off", enterKeyHint: "done",
+      placeholder: chosen.length ? "+ ещё блюдо" : "Найти блюдо" });
+    input.setAttribute("list", "dishOptions");
+    // выбор подсказки приходит без inputType (или insertReplacementText), обычный набор — с ним: «Омлет» не добавится, пока пишут «Омлет с сыром»
+    input.oninput = e => { if ((!e.inputType || e.inputType === "insertReplacementText") && findDish(input.value)) add(input.value); };
+    input.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } };
     const cell = document.createElement("div"); cell.className = "chips";
-    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), sel);
-    const lab = document.createElement("label"); lab.htmlFor = sel.id; lab.textContent = name;
+    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), input);
+    const lab = document.createElement("label"); lab.htmlFor = input.id; lab.textContent = name;
     const row = document.createElement("div"); row.className = "day" + (i === t ? " today" : ""); row.append(lab, cell);
     return row;
-  }));
+  });
+  // прошедшие дни недели свёрнуты в одну строку, чтобы к выходным не листать
+  const pastCount = DAYS.slice(0, t).reduce((n, [k]) => n + menu.week[k].length, 0);
+  const toggle = el("button", { type: "button", className: "linkbtn past-toggle", hidden: t === 0,
+    textContent: showPast ? "Скрыть прошедшие дни" : `Прошедшие дни: ${DAYS[0][1]}${t > 1 ? "–" + DAYS[t - 1][1] : ""} · блюд: ${pastCount}` });
+  toggle.onclick = () => { showPast = !showPast; renderMenu(); };
+  $("week").replaceChildren(toggle, ...(showPast ? rows : rows.slice(t)));
   const setCat = (ci, patch) => saveMenu({ cats: menu.cats.map((c, j) => j === ci ? { ...c, ...patch } : c) });
   // видна одна категория — та, что выбрана кнопкой сверху
   const sel = Math.max(0, menu.cats.findIndex(c => c.name === openCat));
@@ -451,7 +475,7 @@ function renderMenu() {
 
 function saveMenu(patch) {
   menu = { ...menu, ...patch }; renderMenu();
-  write("menu", menu).then(() => $("msg").hidden = true, () => showErr("Нет связи с базой. Меню сохранится, когда появится интернет."));
+  write("menu", { cats: menu.cats, week: { ...menu.week, weekOf: menu.weekOf } }).then(() => $("msg").hidden = true, () => showErr("Нет связи с базой. Меню сохранится, когда появится интернет."));
 }
 
 $("nameForm").onsubmit = e => { e.preventDefault(); if ($("nameInput").value.trim()) setMe($("nameInput").value); };
@@ -462,7 +486,9 @@ $("addCat").onsubmit = e => {
   $("catInput").value = "";
   if (v && !menu.cats.some(c => c.name.toLowerCase() === v.toLowerCase())) { openCat = v; saveMenu({ cats: [...menu.cats, { name: v, dishes: [] }] }); }
 };
-$("clearWeek").onclick = () => saveMenu({ week: Object.fromEntries(DAYS.map(([k]) => [k, []])) });
+$("clearWeek").onclick = () => saveMenu({ week: emptyWeek() });
+// приложение могло пролежать открытым до следующей недели
+document.addEventListener("visibilitychange", () => { if (!document.hidden) renderMenu(); });
 
 renderMenu();
 
