@@ -80,7 +80,9 @@ summary { cursor: pointer; }
 /* панель выбора блюда: выезжает снизу поверх нижней панели */
 .pick-wrap { position: fixed; inset: 0; z-index: 20; }
 .pick-back { position: absolute; inset: 0; background: rgba(17, 17, 17, .35); opacity: 0; transition: opacity .25s ease; }
-.pick-panel { position: absolute; left: 0; right: 0; bottom: 0; max-width: 520px; margin: 0 auto; max-height: 80vh; max-height: 80dvh;
+/* --kb — высота экранной клавиатуры, --vvh — видимая высота экрана (их ставит скрипт): панель стоит над клавиатурой и в неё помещается */
+.pick-panel { position: absolute; left: 0; right: 0; bottom: var(--kb, 0px); max-width: 520px; margin: 0 auto;
+  height: 80vh; height: min(80dvh, calc(var(--vvh, 100dvh) - 24px));
   display: flex; flex-direction: column; gap: 12px; background: var(--paper); border-radius: 24px 24px 0 0;
   padding: 18px max(20px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
   transform: translateY(100%); transition: transform .3s var(--ease); }
@@ -88,15 +90,16 @@ summary { cursor: pointer; }
 .pick-wrap.open .pick-back { opacity: 1; }
 .pick-wrap.open .pick-panel { transform: none; }
 .pick-wrap:not(.open) { pointer-events: none; }
-.pick-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; overflow-y: auto; min-height: 0; padding-bottom: 4px; }
+.pick-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; padding-bottom: 4px; }
 button.pick { padding: 6px 14px; font: 300 .95rem var(--font); letter-spacing: 0; text-transform: none; color: var(--ink);
   background: color-mix(in srgb, var(--c) 18%, var(--paper)); border: 1px solid color-mix(in srgb, var(--c) 60%, var(--paper)); }
 button.pick[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 55%, var(--paper)); border-color: var(--ink); font-weight: 400; }
 button.pick[aria-pressed="true"]::before { content: "✓ "; }
 button.pick.own { --c: var(--stone); }
-button.add-dish { padding: 5px 14px; }
+/* .chips button (крестики на плашках) иначе снимает с кнопки рамку */
+.day .chips button.add-dish { padding: 5px 14px; border: 1px dashed var(--grey); color: var(--ink); font-size: .8rem; letter-spacing: .06em; }
 .past-toggle { justify-self: start; padding: 6px 0; color: var(--grey); font-size: .9rem; }
-.cats { display: grid; gap: 24px; }
+.cats { display: grid; align-content: start; gap: 24px; height: min(52vh, 440px); overflow-y: auto; overscroll-behavior: contain; }
 .cat-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .cat-tabs button::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 99px; background: var(--c); }
 .cat-tabs button[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 45%, var(--paper)); border-color: var(--ink); }
@@ -528,7 +531,7 @@ function renderMenu() {
       $("add-" + ci).focus();
     };
     const chips = el("div", { className: "chips" }, ...c.dishes.map(d => chip(d, () => setCat(ci, { dishes: c.dishes.filter(n => n !== d) }), "", catColor(ci))));
-    return el("div", { className: "cat" }, ...(c.dishes.length ? [] : [head]), chips, form);
+    return el("div", { className: "cat" }, ...(c.dishes.length ? [] : [head]), form, chips);
   }));
   $("clearWeek").disabled = !Object.values(menu.week).some(l => l.length);
 
@@ -557,6 +560,15 @@ $("addCat").onsubmit = e => {
 };
 $("clearWeek").onclick = () => saveMenu({ week: emptyWeek() });
 $("pickSearch").oninput = renderPick;
+// клавиатура телефона закрывает низ экрана, а панель прижата к низу — поднимаем её над клавиатурой
+if (window.visualViewport) {
+  const vv = visualViewport, fit = () => {
+    const st = $("pick").style;
+    st.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px");
+    st.setProperty("--vvh", vv.height + "px");
+  };
+  vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); fit();
+}
 $("pickBack").onclick = $("pickDone").onclick = closePick;
 document.addEventListener("keydown", e => { if (e.key === "Escape" && pickDay) closePick(); });
 // приложение могло пролежать открытым до следующей недели
