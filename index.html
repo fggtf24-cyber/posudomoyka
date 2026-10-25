@@ -65,7 +65,6 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
 .day label { font-size: .78rem; letter-spacing: .2em; text-transform: uppercase; color: var(--grey); }
 .day.today label { color: var(--ink); font-weight: 500; }
 select, input { font: 300 1rem var(--font); color: var(--ink); background: var(--paper); border: 1px solid var(--stone); border-radius: 99px; padding: 6px 12px; width: 100%; min-width: 0; }
-.day.today input { border-color: var(--ink); }
 select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 summary { cursor: pointer; }
 .setup summary { display: flex; justify-content: space-between; list-style: none; }
@@ -78,7 +77,24 @@ summary { cursor: pointer; }
 .chips span { display: inline-flex; align-items: center; padding: 3px 2px 3px 14px; border: 1px solid var(--stone); border-radius: 99px; font-size: .9rem; }
 .chips button { background: none; border: 0; color: var(--grey); padding: 0 10px; font-size: 1rem; letter-spacing: 0; }
 .day .chips { margin-top: 0; align-items: center; }
-.day .chips input { flex: 1 1 9em; width: 0; }
+/* панель выбора блюда: выезжает снизу поверх нижней панели */
+.pick-wrap { position: fixed; inset: 0; z-index: 20; }
+.pick-back { position: absolute; inset: 0; background: rgba(17, 17, 17, .35); opacity: 0; transition: opacity .25s ease; }
+.pick-panel { position: absolute; left: 0; right: 0; bottom: 0; max-width: 520px; margin: 0 auto; max-height: 80vh; max-height: 80dvh;
+  display: flex; flex-direction: column; gap: 12px; background: var(--paper); border-radius: 24px 24px 0 0;
+  padding: 18px max(20px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  transform: translateY(100%); transition: transform .3s var(--ease); }
+/* открытие и закрытие — переключением класса open, чтобы обе стороны анимировались */
+.pick-wrap.open .pick-back { opacity: 1; }
+.pick-wrap.open .pick-panel { transform: none; }
+.pick-wrap:not(.open) { pointer-events: none; }
+.pick-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; overflow-y: auto; min-height: 0; padding-bottom: 4px; }
+button.pick { padding: 6px 14px; font: 300 .95rem var(--font); letter-spacing: 0; text-transform: none; color: var(--ink);
+  background: color-mix(in srgb, var(--c) 18%, var(--paper)); border: 1px solid color-mix(in srgb, var(--c) 60%, var(--paper)); }
+button.pick[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 55%, var(--paper)); border-color: var(--ink); font-weight: 400; }
+button.pick[aria-pressed="true"]::before { content: "✓ "; }
+button.pick.own { --c: var(--stone); }
+button.add-dish { padding: 5px 14px; }
 .past-toggle { justify-self: start; padding: 6px 0; color: var(--grey); font-size: .9rem; }
 .cats { display: grid; gap: 24px; }
 .cat-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -118,7 +134,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
 /* вырез: круг r=36 вокруг кнопки и «плечи» r=14, касающиеся круга (центры плеч на ±48.54, 14) */
 .cut { position: absolute; left: 50%; top: -34px; width: 100px; height: 74px; margin-left: -50px; overflow: visible; fill: var(--paper); }
 .fab { top: -28px !important; width: 60px; height: 60px; margin-left: -30px; background: var(--sand); border: 1.5px solid var(--ink); border-radius: 99px; }
-@media (prefers-reduced-motion: reduce) { .gauge i, .tab svg, .ind { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .gauge i, .tab svg, .ind { transition: none; } .pick-back, .pick-panel { transition: none; } }
 </style>
 </head>
 <body>
@@ -194,7 +210,6 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   <section>
     <div class="row"><p class="label">Неделя</p><button class="chip" id="clearWeek">Очистить</button></div>
     <div class="week" id="week"></div>
-    <datalist id="dishOptions"></datalist>
   </section>
 
   <section>
@@ -207,6 +222,17 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
     </form>
   </section>
 </main>
+
+<div class="pick-wrap" id="pick" hidden>
+  <div class="pick-back" id="pickBack"></div>
+  <div class="pick-panel" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <div class="row"><p class="label" id="pickTitle"></p><button class="chip" id="pickDone" type="button">Готово</button></div>
+    <input id="pickSearch" type="search" placeholder="Поиск блюда" autocomplete="off" enterkeyhint="search" aria-label="Поиск блюда">
+    <div class="cat-tabs" id="pickCats"></div>
+    <p class="note" id="pickFull" hidden>В этот день уже 8 блюд — уберите одно, чтобы добавить другое.</p>
+    <div class="pick-list" id="pickDishes"></div>
+  </div>
+</div>
 
 <nav class="tabbar" role="tablist" aria-label="Разделы">
   <div class="ind" id="ind"><svg class="cut" viewBox="-50 -34 100 74" aria-hidden="true"><circle cx="0" cy="2" r="36"/><path d="M-48.54 0A14 14 0 0 1-34.95 10.64A36 36 0 0 0 34.95 10.64A14 14 0 0 1 48.54 0Z"/></svg><i class="fab"></i></div>
@@ -394,32 +420,74 @@ function chip(text, onRemove, note, color) {
   return c;
 }
 
+// Панель выбора блюда на день: категории как в списке блюд, поиск сразу по всем.
+let pickDay = null, pickCat = "";
+const DAY_NAMES = { mon: "понедельник", tue: "вторник", wed: "среду", thu: "четверг", fri: "пятницу", sat: "субботу", sun: "воскресенье" };
+function openPick(k) {
+  pickDay = k; pickCat = pickCat || openCat; $("pickSearch").value = "";
+  $("pick").hidden = false; document.body.style.overflow = "hidden";
+  renderPick();
+  void $("pick").offsetHeight; // сначала отрисовать закрытое положение, иначе выезда не будет
+  $("pick").classList.add("open");
+}
+function closePick() {
+  pickDay = null; document.body.style.overflow = "";
+  $("pick").classList.remove("open");
+  setTimeout(() => { if (!pickDay) $("pick").hidden = true; }, 300); // ждём, пока панель уедет вниз
+}
+function togglePick(d) {
+  const chosen = menu.week[pickDay];
+  if (!d) return;
+  const on = chosen.find(p => p.d.toLowerCase() === d.toLowerCase());
+  if (!on && chosen.length >= 8) return;
+  saveMenu({ week: { ...menu.week, [pickDay]: on ? chosen.filter(p => p !== on) : [...chosen, { d, by: me }] } });
+}
+function renderPick() {
+  if (!pickDay) return;
+  const chosen = menu.week[pickDay], typed = $("pickSearch").value.trim(), q = typed.toLowerCase();
+  $("pickTitle").textContent = `Блюда на ${DAY_NAMES[pickDay]}` + (chosen.length ? ` · ${chosen.length}` : "");
+  const sel = Math.max(0, menu.cats.findIndex(c => c.name === pickCat));
+  $("pickCats").hidden = !!q;
+  $("pickCats").replaceChildren(...menu.cats.map((c, ci) => {
+    const b = el("button", { type: "button", className: "chip", ariaPressed: String(ci === sel) }, c.name);
+    b.style.setProperty("--c", catColor(ci));
+    b.onclick = () => { pickCat = c.name; renderPick(); };
+    return b;
+  }));
+  const list = q ? menu.cats.flatMap((c, ci) => c.dishes.filter(d => d.toLowerCase().includes(q)).map(d => [d, ci]))
+    : (menu.cats[sel]?.dishes || []).map(d => [d, sel]);
+  const full = chosen.length >= 8;
+  const btns = list.map(([d, ci]) => {
+    const on = chosen.some(p => p.d === d);
+    const b = el("button", { type: "button", className: "pick", ariaPressed: String(on), disabled: full && !on, textContent: d });
+    b.style.setProperty("--c", catColor(ci));
+    b.onclick = () => togglePick(d);
+    return b;
+  });
+  // своего блюда нет в списке — можно добавить к дню как есть
+  if (q && !list.some(([d]) => d.toLowerCase() === q)) {
+    const own = el("button", { type: "button", className: "pick own", disabled: full, textContent: `+ Добавить «${typed.slice(0, 40)}»` });
+    own.onclick = () => { togglePick(typed.slice(0, 40)); $("pickSearch").value = ""; renderPick(); };
+    btns.push(own);
+  }
+  $("pickDishes").replaceChildren(...btns);
+  $("pickFull").hidden = !full;
+}
+
 let showPast = false;
 function renderMenu() {
   // началась новая неделя — старые выборы не показываем, база перезапишется при первом выборе
   if (menu.weekOf !== mondayOf()) menu = { ...menu, week: emptyWeek(), weekOf: mondayOf() };
   const t = (new Date().getDay() + 6) % 7;
   const setDay = (k, list) => saveMenu({ week: { ...menu.week, [k]: list } });
-  // подсказки поиска: все блюда, подписанные категорией
-  $("dishOptions").replaceChildren(...menu.cats.flatMap(c => c.dishes.map(d => el("option", { value: d, label: c.name }))));
   const rows = DAYS.map(([k, name], i) => {
     const chosen = menu.week[k];
-    const add = v => {
-      const d = (findDish(v)?.dishes.find(x => x.toLowerCase() === v.trim().toLowerCase()) || v.trim()).slice(0, 40);
-      if (!d || chosen.some(p => p.d.toLowerCase() === d.toLowerCase())) return;
-      setDay(k, [...chosen, { d, by: me }]);
-      $("m-" + k).focus(); // клавиатура остаётся открытой для следующего блюда
-    };
     // выбирать можно, только представившись
-    const input = el("input", { id: "m-" + k, disabled: !me, autocomplete: "off", enterKeyHint: "done",
-      placeholder: chosen.length ? "+ ещё блюдо" : "Найти блюдо" });
-    input.setAttribute("list", "dishOptions");
-    // выбор подсказки приходит без inputType (или insertReplacementText), обычный набор — с ним: «Омлет» не добавится, пока пишут «Омлет с сыром»
-    input.oninput = e => { if ((!e.inputType || e.inputType === "insertReplacementText") && findDish(input.value)) add(input.value); };
-    input.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } };
+    const add = el("button", { type: "button", id: "m-" + k, className: "chip add-dish", disabled: !me, textContent: "+ блюдо" });
+    add.onclick = () => openPick(k);
     const cell = document.createElement("div"); cell.className = "chips";
-    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), input);
-    const lab = document.createElement("label"); lab.htmlFor = input.id; lab.textContent = name;
+    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), add);
+    const lab = document.createElement("label"); lab.htmlFor = add.id; lab.textContent = name;
     const row = document.createElement("div"); row.className = "day" + (i === t ? " today" : ""); row.append(lab, cell);
     return row;
   });
@@ -429,6 +497,7 @@ function renderMenu() {
     textContent: showPast ? "Скрыть прошедшие дни" : `Прошедшие дни: ${DAYS[0][1]}${t > 1 ? "–" + DAYS[t - 1][1] : ""} · блюд: ${pastCount}` });
   toggle.onclick = () => { showPast = !showPast; renderMenu(); };
   $("week").replaceChildren(toggle, ...(showPast ? rows : rows.slice(t)));
+  renderPick();
   const setCat = (ci, patch) => saveMenu({ cats: menu.cats.map((c, j) => j === ci ? { ...c, ...patch } : c) });
   // видна одна категория — та, что выбрана кнопкой сверху
   const sel = Math.max(0, menu.cats.findIndex(c => c.name === openCat));
@@ -487,6 +556,9 @@ $("addCat").onsubmit = e => {
   if (v && !menu.cats.some(c => c.name.toLowerCase() === v.toLowerCase())) { openCat = v; saveMenu({ cats: [...menu.cats, { name: v, dishes: [] }] }); }
 };
 $("clearWeek").onclick = () => saveMenu({ week: emptyWeek() });
+$("pickSearch").oninput = renderPick;
+$("pickBack").onclick = $("pickDone").onclick = closePick;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && pickDay) closePick(); });
 // приложение могло пролежать открытым до следующей недели
 document.addEventListener("visibilitychange", () => { if (!document.hidden) renderMenu(); });
 
