@@ -18,7 +18,11 @@
   color-scheme: light;
 }
 * { box-sizing: border-box; }
-html { background: var(--paper); }
+/* без браузерных следов в приложении: синей подсветки нажатия, зума по двойному тапу, выделения текста на кнопках */
+html { background: var(--paper); -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button, label, .tabbar, .chips span, .flow, .label, summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+button { transition: transform .12s ease; }
+button:active:not(:disabled) { transform: scale(.96); }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 300 16px/1.55 var(--font);
   padding: env(safe-area-inset-top, 0px) max(20px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(20px, env(safe-area-inset-left, 0px)); }
 main { max-width: 440px; margin: 0 auto; padding-block: 20px 48px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
