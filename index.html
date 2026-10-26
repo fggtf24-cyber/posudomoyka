@@ -71,11 +71,15 @@ code { font: 400 .95rem var(--font); background: var(--sand); padding: 2px 8px; 
 select, input { font: 300 1rem var(--font); color: var(--ink); background: var(--paper); border: 1px solid var(--stone); border-radius: 99px; padding: 6px 12px; width: 100%; min-width: 0; }
 select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 summary { cursor: pointer; }
-.setup summary { display: flex; justify-content: space-between; list-style: none; }
-.setup summary::-webkit-details-marker { display: none; }
-.setup summary::after { content: "+"; font-size: 1.1rem; line-height: 1; letter-spacing: 0; }
-.setup[open] summary::after { content: "−"; }
-.setup .by { margin: 16px 0 6px; }
+/* переключатель уведомлений, как в Android-приложении */
+.tgl { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; cursor: pointer; }
+.tgl small { display: block; color: var(--grey); font-size: .82rem; }
+.tgl input { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 46px; height: 26px; margin: 0; padding: 0;
+  border-radius: 99px; border: 1.5px solid var(--stone); background: var(--sand); cursor: pointer; transition: background .2s; }
+.tgl input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: var(--stone); transition: transform .2s; }
+.tgl input:checked { background: var(--ink); border-color: var(--ink); }
+.tgl input:checked::after { transform: translateX(20px); background: var(--paper); }
+.tgl input:disabled { opacity: .35; }
 .add { display: flex; gap: 8px; margin-top: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .chips span { display: inline-flex; align-items: center; padding: 3px 2px 3px 14px; border: 1px solid var(--stone); border-radius: 99px; font-size: .9rem; }
@@ -136,7 +140,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
 /* содержимое растворяется над панелью и не лезет под поднятую кнопку */
 .tabbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 44px; pointer-events: none;
   background: linear-gradient(rgba(246, 244, 238, 0), var(--paper) 80%); }
-.ind { position: absolute; top: 0; left: 0; width: 50%; z-index: 1; pointer-events: none; transition: transform .35s var(--ease); }
+.ind { position: absolute; top: 0; left: 0; width: calc(100% / 3); z-index: 1; pointer-events: none; transition: transform .35s var(--ease); }
 .ind > i { position: absolute; left: 50%; top: 0; }
 /* вырез: круг r=36 вокруг кнопки и «плечи» r=14, касающиеся круга (центры плеч на ±48.54, 14) */
 .cut { position: absolute; left: 50%; top: -34px; width: 100px; height: 74px; margin-left: -50px; overflow: visible; fill: var(--paper); }
@@ -178,22 +182,6 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
     <button id="b2" disabled>Я загрузил</button>
     <button class="ghost" id="u2" hidden>Нажал случайно — отменить</button>
   </section>
-
-  <section>
-    <details class="setup">
-    <summary class="label">Настройка</summary>
-    <p class="by">Уведомления</p>
-    <ol>
-      <li>Установите бесплатное приложение ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a></li>
-      <li>В ntfy нажмите «+» и введите тему: <code id="topic"></code> <button class="chip" id="copy">Скопировать</button></li>
-    </ol>
-    <p class="by">На экран «Домой»</p>
-    <ol>
-      <li>iPhone, Safari: «Поделиться» → «На экран „Домой"».</li>
-      <li>Android, Chrome: меню ⋮ → «Добавить на главный экран».</li>
-    </ol>
-    </details>
-  </section>
 </main>
 
 <main id="p1" role="tabpanel" aria-label="Меню" hidden>
@@ -230,6 +218,37 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   </section>
 </main>
 
+<main id="p2" role="tabpanel" aria-label="Настройки" hidden>
+  <header>
+    <h1>Настройки</h1>
+    <p class="sub">на этом устройстве</p>
+    <div class="dash"></div>
+  </header>
+
+  <section>
+    <p class="label">Уведомления</p>
+    <label class="tgl"><span>Напоминать о сроках<small>За 15 минут до разгрузки (17:00) и до конца двух часов на загрузку.</small></span><input type="checkbox" id="pushRem"></label>
+    <label class="tgl"><span>Сообщать, когда разгрузили или загрузили<small>Приходит почти сразу после нажатия.</small></span><input type="checkbox" id="pushNews"></label>
+    <p class="note" id="pushNote" hidden></p>
+  </section>
+
+  <section>
+    <p class="label">Через приложение ntfy</p>
+    <ol>
+      <li>Установите бесплатное приложение ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a></li>
+      <li>В ntfy нажмите «+» и введите тему: <code id="topic"></code> <button class="chip" id="copy">Скопировать</button></li>
+    </ol>
+  </section>
+
+  <section>
+    <p class="label">На экран «Домой»</p>
+    <ol>
+      <li>iPhone, Safari: «Поделиться» → «На экран „Домой"».</li>
+      <li>Android, Chrome: меню ⋮ → «Добавить на главный экран».</li>
+    </ol>
+  </section>
+</main>
+
 <div class="pick-wrap" id="pick" hidden>
   <div class="pick-back" id="pickBack"></div>
   <div class="pick-panel" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
@@ -245,6 +264,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   <div class="ind" id="ind"><svg class="cut" viewBox="-50 -34 100 74" aria-hidden="true"><circle cx="0" cy="2" r="36"/><path d="M-48.54 0A14 14 0 0 1-34.95 10.64A36 36 0 0 0 34.95 10.64A14 14 0 0 1 48.54 0Z"/></svg><i class="fab"></i></div>
   <button class="tab" role="tab" aria-controls="p0"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M4 8h16M7.5 5.5h.01"/><circle cx="12" cy="14.5" r="3.5"/></svg><span>ПОСУДА</span></button>
   <button class="tab" role="tab" aria-controls="p1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v5a2 2 0 0 0 4 0V3M7 3v18M17 21V3c-2 1.5-3 4-3 7v3h3"/></svg><span>МЕНЮ</span></button>
+  <button class="tab" role="tab" aria-controls="p2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>НАСТРОЙКИ</span></button>
 </nav>
 
 <script>
@@ -345,12 +365,61 @@ const write = async (id, data) => { const f = await fb;
 
 function showErr(t) { $("msg").textContent = t; $("msg").hidden = false; }
 
+// Web Push: уведомления от иконки «Посудомойка» — iPhone с экрана «Домой», Chrome на Android, компьютер.
+// Рассылает сервер на Cloudflare (папка push): он следит за базой и напоминает о сроках.
+const PUSH = "https://posudomoyka-push.fggtf24.workers.dev";
+const PUSH_KEY = "BC_EWb5UuPpS6M4NKeKrMJbhFiU51kihWKqEyb-tH0APrwskmKPXvkRT1p3K6xg1kN3TropEnhEhzOduWnytPRE";
+// толкнуть сервер сразу после нажатия, чтобы новость пришла за секунды, а не к следующей минутной проверке
+const ping = () => { if (PUSH) fetch(PUSH + "/ping", { method: "POST" }).catch(() => {}); };
+const pushOk = !!PUSH && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+const pushPrefs = () => { try { return JSON.parse(localStorage.getItem("posuda-push")) || {}; } catch { return {}; } };
+function pushNote(t) { $("pushNote").textContent = t; $("pushNote").hidden = !t; }
+function renderPush() {
+  const p = pushPrefs();
+  $("pushRem").checked = !!p.reminders; $("pushNews").checked = !!p.news;
+  $("pushRem").disabled = $("pushNews").disabled = !pushOk;
+  if (!pushOk) {
+    const ios = /iPhone|iPad/.test(navigator.userAgent), home = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    pushNote(ios && !home ? "На iPhone сначала добавьте сайт на экран «Домой» (инструкция ниже) и откройте его оттуда — там появятся уведомления."
+      : "Этот браузер не умеет присылать уведомления.");
+  }
+}
+async function setPush(kind, on) {
+  // разрешение спрашиваем сразу, пока длится нажатие: Safari на iPhone иначе откажет
+  const perm = on ? Notification.requestPermission() : null;
+  const p = { ...pushPrefs(), [kind]: on };
+  try {
+    if (perm && await perm !== "granted") throw new Error("denied");
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub && (p.news || p.reminders))
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(atob(PUSH_KEY.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)) });
+    if (sub) {
+      const r = await fetch(PUSH + "/subscribe", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sub: sub.toJSON(), news: !!p.news, reminders: !!p.reminders }) });
+      if (!r.ok) throw new Error("server");
+      if (!p.news && !p.reminders) await sub.unsubscribe();
+    }
+    try { localStorage.setItem("posuda-push", JSON.stringify(p)); } catch {}
+    pushNote("");
+  } catch (e) {
+    pushNote(e.message === "denied" ? "Уведомления запрещены. Разрешите их в настройках телефона для «Посудомойки»."
+      : "Не получилось включить. Проверьте интернет и попробуйте ещё раз.");
+  }
+  renderPush();
+}
+$("pushRem").onchange = e => setPush("reminders", e.target.checked);
+$("pushNews").onchange = e => setPush("news", e.target.checked);
+renderPush();
+
 async function save(patch, after) {
   busy = true; render();
   const next = { ...cur(), ...patch };
   try {
     await write("dishwasher", next);
     state = next; $("msg").hidden = true;
+    ping();
     await after?.(next);
   } catch { showErr("Нет связи с базой. Отметка сохранится, когда появится интернет, но уведомления не ушли."); }
   busy = false; render();
@@ -586,16 +655,17 @@ $("copy").onclick = async () => {
   catch { getSelection().selectAllChildren($("topic")); }
 };
 
-// вкладки: #menu в адресе открывает меню сразу (удобно для закладки)
+// вкладки: #menu и #settings в адресе открывают их сразу (удобно для закладки)
+const HASHES = ["", "#menu", "#settings"];
 const tabs = [...document.querySelectorAll(".tab")];
 function showTab(i) {
   tabs.forEach((t, j) => t.setAttribute("aria-selected", j === i));
-  $("p0").hidden = i !== 0; $("p1").hidden = i !== 1;
+  ["p0", "p1", "p2"].forEach((id, j) => $(id).hidden = i !== j);
   $("ind").style.transform = `translateX(${i * 100}%)`;
-  history.replaceState(null, "", i ? "#menu" : location.pathname + location.search);
+  history.replaceState(null, "", HASHES[i] || location.pathname + location.search);
 }
 tabs.forEach((t, i) => t.onclick = () => { showTab(i); scrollTo(0, 0); });
-const tabFromHash = () => showTab(location.hash === "#menu" ? 1 : 0);
+const tabFromHash = () => showTab(Math.max(0, HASHES.indexOf(location.hash)));
 tabFromHash();
 addEventListener("hashchange", tabFromHash);
 
