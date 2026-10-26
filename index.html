@@ -391,6 +391,8 @@ const write = async (id, data) => { const f = await fb; await Promise.race([f.se
 const edit = async (id, field, op, item) => { const f = await fb; await Promise.race([f.edit(id, field, op, item), timeout()]); };
 
 function showErr(t) { $("msg").textContent = t; $("msg").hidden = false; }
+// отказ правил базы — это не «нет связи»: так честнее и понятно, что чинить
+const dbErr = (e, text) => showErr(e?.code === "permission-denied" ? "База не пускает запись: правила в консоли Firebase устарели, их нужно обновить." : text);
 
 // Web Push: уведомления от иконки «Свиноферма» — iPhone с экрана «Домой», Chrome на Android, компьютер.
 // Рассылает сервер на Cloudflare (папка push): он следит за базой и напоминает о сроках.
@@ -450,7 +452,7 @@ async function save(patch) {
     await write("dishwasher", next);
     state = next; $("msg").hidden = true;
     ping(); // уведомления рассылает сервер на Cloudflare
-  } catch { showErr("Нет связи с базой. Отметка сохранится, когда появится интернет."); }
+  } catch (e) { dbErr(e, "Нет связи с базой. Отметка сохранится, когда появится интернет."); }
   busy = false; render();
 }
 
@@ -634,7 +636,7 @@ function renderMenu() {
 
 function saveMenu(patch) {
   menu = { ...menu, ...patch }; renderMenu();
-  write("menu", { cats: menu.cats, week: { ...menu.week, weekOf: menu.weekOf } }).then(() => $("msg").hidden = true, () => showErr("Нет связи с базой. Меню сохранится, когда появится интернет."));
+  write("menu", { cats: menu.cats, week: { ...menu.week, weekOf: menu.weekOf } }).then(() => $("msg").hidden = true, e => dbErr(e, "Нет связи с базой. Меню сохранится, когда появится интернет."));
 }
 
 $("nameForm").onsubmit = e => { e.preventDefault(); if ($("nameInput").value.trim()) setMe($("nameInput").value); };
@@ -684,7 +686,7 @@ function listEdit(field, op, item) {
   // сразу на экране, база догонит
   lists = { ...lists, [field]: op === "add" ? [...lists[field], item] : lists[field].filter(x => x !== item) };
   renderLists();
-  edit("lists", field, op, item).catch(() => showErr("Нет связи с базой. Список сохранится, когда появится интернет."));
+  edit("lists", field, op, item).catch(e => dbErr(e, "Нет связи с базой. Список сохранится, когда появится интернет."));
 }
 const toggleDone = (field, it) => { listEdit(field, "del", it); listEdit(field, "add", { ...it, done: !it.done }); };
 
@@ -756,7 +758,7 @@ function renderToday() {
 async function saveReady(ready) {
   lists = { ...lists, ready }; renderToday();
   try { const f = await fb; await Promise.race([f.replace("lists", { ready }), timeout()]); ping(); }
-  catch { showErr("Нет связи с базой. Проверьте интернет и нажмите ещё раз."); }
+  catch (e) { dbErr(e, "Нет связи с базой. Проверьте интернет и нажмите ещё раз."); }
 }
 function cancelReady(dish) {
   const r = lists?.ready; if (!r) return;
