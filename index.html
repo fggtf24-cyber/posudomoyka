@@ -94,6 +94,7 @@ summary { cursor: pointer; }
 .item.done .item-t { text-decoration: line-through; color: var(--grey); }
 .item .item-x { flex: none; color: var(--grey); font-size: 1.25rem; padding: 0 4px; }
 .item button.chip { flex: none; border: 1.5px solid var(--ink); border-radius: 99px; padding: 5px 16px; }
+.item small .undo { font: inherit; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 .items .empty { margin: 0; color: var(--grey); }
 #p3 .add { margin-top: 0; }
 .todo-add { display: grid; gap: 8px; }
@@ -671,7 +672,8 @@ const okItem = (v, todo) => v && typeof v === "object" && typeof v.id === "strin
 const cleanLists = d => ({ shop: (Array.isArray(d?.shop) ? d.shop : []).filter(v => okItem(v)),
   todo: (Array.isArray(d?.todo) ? d.todo : []).filter(v => okItem(v, true)),
   ready: typeof d?.ready?.at === "number" ? { at: d.ready.at, by: String(d.ready.by || "").slice(0, 20), text: String(d.ready.text || "").slice(0, 200),
-    dishes: Object.fromEntries(Object.entries(d.ready.dishes || {}).filter(([, v]) => typeof v === "number")) } : null });
+    dishes: Object.fromEntries(Object.entries(d.ready.dishes || {}).filter(([, v]) => typeof v === "number")),
+    undoAt: typeof d.ready.undoAt === "number" ? d.ready.undoAt : 0, undoText: String(d.ready.undoText || "").slice(0, 40) } : null });
 const newId = () => Math.random().toString(36).slice(2, 10);
 const REMINDS = [[1, "Напомнить накануне"], [0, "В тот же день"], [2, "За 2 дня"], [-1, "Не напоминать"]];
 const remindText = r => ({ 0: "напомним в этот день", 1: "напомним накануне", 2: "напомним за 2 дня" })[r] || "";
@@ -737,7 +739,12 @@ function readyRow(dish, at) {
   const b = el("button", { className: "chip", textContent: at ? "Позвать ещё раз" : dish ? "Готово" : "Еда готова" });
   b.onclick = () => callReady(dish);
   const body = el("div", { className: "item-body" }, el("span", { className: "item-t", textContent: dish || "Блюда на сегодня не выбраны" }));
-  if (at) body.append(el("small", { textContent: `готово в ${hm(at)}` }));
+  if (at) {
+    // нажали по ошибке — снять отметку, всем придёт «Отбой»
+    const undo = el("button", { type: "button", className: "undo", textContent: "отменить" });
+    undo.onclick = () => cancelReady(dish);
+    body.append(el("small", {}, `готово в ${hm(at)} · `, undo));
+  }
   return el("div", { className: "item" }, body, b);
 }
 function renderToday() {
@@ -746,15 +753,22 @@ function renderToday() {
   // блюда не выбраны — просто позвать к столу
   $("todayList").replaceChildren(...(picks.length ? picks.map(d => readyRow(d, isToday(done[d]) ? done[d] : 0)) : [readyRow("", 0)]));
 }
+async function saveReady(ready) {
+  lists = { ...lists, ready }; renderToday();
+  try { const f = await fb; await Promise.race([f.replace("lists", { ready }), timeout()]); ping(); }
+  catch { showErr("Нет связи с базой. Проверьте интернет и нажмите ещё раз."); }
+}
+function cancelReady(dish) {
+  const r = lists?.ready; if (!r) return;
+  const dishes = Object.fromEntries(Object.entries(r.dishes || {}).filter(([d, v]) => d !== dish && isToday(v)));
+  saveReady({ ...r, dishes, undoAt: Date.now(), undoText: dish });
+}
 async function callReady(dish) {
   const at = Date.now();
   // отметки готовности храним только за сегодня
   const dishes = Object.fromEntries(Object.entries(lists?.ready?.dishes || {}).filter(([, v]) => isToday(v)));
   if (dish) dishes[dish] = at;
-  const ready = { at, by: me, text: dish, dishes };
-  lists = { ...lists, ready }; renderToday();
-  try { const f = await fb; await Promise.race([f.replace("lists", { ready }), timeout()]); ping(); }
-  catch { showErr("Нет связи с базой. Проверьте интернет и нажмите ещё раз."); }
+  saveReady({ ...(lists?.ready || {}), at, by: me, text: dish, dishes });
 }
 
 // вкладки: #menu, #lists и #settings в адресе открывают их сразу (удобно для закладки)
