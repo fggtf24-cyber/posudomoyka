@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "2.4",
-  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v2.4/posudomoyka.apk",
-  "notes": "Прямоугольная нижняя панель. Обновления теперь приходят прямо в приложение."
+  "versionCode": 7,
+  "versionName": "2.5",
+  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v2.5/posudomoyka.apk",
+  "notes": "Списки покупок и дел с напоминаниями. Кнопка «Готово» у каждого блюда — всем приходит «Еда готова»."
 }
