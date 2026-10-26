@@ -2,7 +2,7 @@
 self.addEventListener("push", e => {
   let m = {};
   try { m = e.data.json(); } catch {}
-  e.waitUntil(self.registration.showNotification(m.title || "Посудомойка",
+  e.waitUntil(self.registration.showNotification(m.title || "Свиноферма",
     { body: m.body || "", icon: "icon.png", badge: "icon.png", tag: m.tag, renotify: true }));
 });
 

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Посудомойка</title>
+<title>Свиноферма</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Посудомойка">
+<meta name="apple-mobile-web-app-title" content="Свиноферма">
 <meta name="theme-color" content="#f6f4ee">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&display=swap">
 <style>
@@ -392,7 +392,7 @@ const edit = async (id, field, op, item) => { const f = await fb; await Promise.
 
 function showErr(t) { $("msg").textContent = t; $("msg").hidden = false; }
 
-// Web Push: уведомления от иконки «Посудомойка» — iPhone с экрана «Домой», Chrome на Android, компьютер.
+// Web Push: уведомления от иконки «Свиноферма» — iPhone с экрана «Домой», Chrome на Android, компьютер.
 // Рассылает сервер на Cloudflare (папка push): он следит за базой и напоминает о сроках.
 const PUSH = "https://posudomoyka-push.fggtf24.workers.dev";
 const PUSH_KEY = "BC_EWb5UuPpS6M4NKeKrMJbhFiU51kihWKqEyb-tH0APrwskmKPXvkRT1p3K6xg1kN3TropEnhEhzOduWnytPRE";
@@ -432,7 +432,7 @@ async function setPush(kind, on) {
     try { localStorage.setItem("posuda-push", JSON.stringify(p)); } catch {}
     pushNote("");
   } catch (e) {
-    pushNote(e.message === "denied" ? "Уведомления запрещены. Разрешите их в настройках телефона для «Посудомойки»."
+    pushNote(e.message === "denied" ? "Уведомления запрещены. Разрешите их в настройках телефона для «Свинофермы»."
       : "Не получилось включить. Проверьте интернет и попробуйте ещё раз.");
   }
   renderPush();
