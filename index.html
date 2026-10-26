@@ -80,6 +80,25 @@ summary { cursor: pointer; }
 .tgl input:checked { background: var(--ink); border-color: var(--ink); }
 .tgl input:checked::after { transform: translateX(20px); background: var(--paper); }
 .tgl input:disabled { opacity: .35; }
+
+/* списки: кружок-отметка, текст с подписью, крестик */
+.items { display: grid; }
+.item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--sand); }
+.item:last-child { border-bottom: 0; }
+.item button { background: none; border: 0; border-radius: 0; padding: 0; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.item .check { flex: none; width: 22px; height: 22px; border: 1.5px solid var(--ink); border-radius: 50%; }
+.item.done .check { background: var(--ink); box-shadow: inset 0 0 0 3px var(--paper); }
+.item-body { flex: 1; min-width: 0; display: grid; }
+.item-t { overflow-wrap: anywhere; }
+.item small { color: var(--grey); font-size: .8rem; }
+.item.done .item-t { text-decoration: line-through; color: var(--grey); }
+.item .item-x { flex: none; color: var(--grey); font-size: 1.25rem; padding: 0 4px; }
+.item button.chip { flex: none; border: 1.5px solid var(--ink); border-radius: 99px; padding: 5px 16px; }
+.items .empty { margin: 0; color: var(--grey); }
+#p3 .add { margin-top: 0; }
+.todo-add { display: grid; gap: 8px; }
+.remind { display: flex; flex-wrap: wrap; gap: 6px; }
+.remind button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 .add { display: flex; gap: 8px; margin-top: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .chips span { display: inline-flex; align-items: center; padding: 3px 2px 3px 14px; border: 1px solid var(--stone); border-radius: 99px; font-size: .9rem; }
@@ -140,7 +159,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
 /* содержимое растворяется над панелью и не лезет под поднятую кнопку */
 .tabbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 44px; pointer-events: none;
   background: linear-gradient(rgba(246, 244, 238, 0), var(--paper) 80%); }
-.ind { position: absolute; top: 0; left: 0; width: calc(100% / 3); z-index: 1; pointer-events: none; transition: transform .35s var(--ease); }
+.ind { position: absolute; top: 0; left: 0; width: calc(100% / 4); z-index: 1; pointer-events: none; transition: transform .35s var(--ease); }
 .ind > i { position: absolute; left: 50%; top: 0; }
 /* вырез: круг r=36 вокруг кнопки и «плечи» r=14, касающиеся круга (центры плеч на ±48.54, 14) */
 .cut { position: absolute; left: 50%; top: -34px; width: 100px; height: 74px; margin-left: -50px; overflow: visible; fill: var(--paper); }
@@ -203,6 +222,11 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   </section>
 
   <section>
+    <div class="row"><p class="label">Сегодня</p><span class="by" id="readyNote"></span></div>
+    <div class="items" id="todayList"></div>
+  </section>
+
+  <section>
     <div class="row"><p class="label">Неделя</p><button class="chip" id="clearWeek">Очистить</button></div>
     <div class="week" id="week"></div>
   </section>
@@ -218,6 +242,33 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   </section>
 </main>
 
+<main id="p3" role="tabpanel" aria-label="Списки" hidden>
+  <header>
+    <h1>Списки</h1>
+    <p class="sub">покупки и дела</p>
+    <div class="dash"></div>
+  </header>
+
+  <section>
+    <div class="row"><p class="label">Купить</p><button class="chip" id="clearBought">Убрать купленное</button></div>
+    <form class="add" id="shopForm">
+      <input id="shopInput" maxlength="60" placeholder="Молоко, хлеб…" aria-label="Что купить" enterkeyhint="done">
+      <button class="chip" type="submit">Добавить</button>
+    </form>
+    <div class="items" id="shopList"></div>
+  </section>
+
+  <section>
+    <p class="label">Дела</p>
+    <form class="todo-add" id="todoForm">
+      <input id="todoInput" maxlength="80" placeholder="Например, едем за загранпаспортами" aria-label="Что сделать" enterkeyhint="done">
+      <div class="add"><input type="date" id="todoDate" aria-label="Когда"><button class="chip" type="submit">Добавить</button></div>
+      <div class="remind" id="todoRemind" role="group" aria-label="Когда напомнить"></div>
+    </form>
+    <div class="items" id="todoList"></div>
+  </section>
+</main>
+
 <main id="p2" role="tabpanel" aria-label="Настройки" hidden>
   <header>
     <h1>Настройки</h1>
@@ -229,6 +280,8 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
     <p class="label">Уведомления</p>
     <label class="tgl"><span>Напоминать о сроках<small>За 15 минут до разгрузки (17:00) и до конца двух часов на загрузку.</small></span><input type="checkbox" id="pushRem"></label>
     <label class="tgl"><span>Сообщать, когда разгрузили или загрузили<small>Приходит почти сразу после нажатия.</small></span><input type="checkbox" id="pushNews"></label>
+    <label class="tgl"><span>Напоминать о делах<small>В 10:00 в день, выбранный у дела во вкладке «Списки».</small></span><input type="checkbox" id="pushTodo"></label>
+    <label class="tgl"><span>Сообщать, что еда готова<small>Когда кто-то нажмёт «Готово» у блюда во вкладке «Меню».</small></span><input type="checkbox" id="pushReady"></label>
     <p class="note" id="pushNote" hidden></p>
   </section>
 
@@ -256,6 +309,7 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   <div class="ind" id="ind"><svg class="cut" viewBox="-50 -34 100 74" aria-hidden="true"><circle cx="0" cy="2" r="36"/><path d="M-48.54 0A14 14 0 0 1-34.95 10.64A36 36 0 0 0 34.95 10.64A14 14 0 0 1 48.54 0Z"/></svg><i class="fab"></i></div>
   <button class="tab" role="tab" aria-controls="p0"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M4 8h16M7.5 5.5h.01"/><circle cx="12" cy="14.5" r="3.5"/></svg><span>ПОСУДА</span></button>
   <button class="tab" role="tab" aria-controls="p1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v5a2 2 0 0 0 4 0V3M7 3v18M17 21V3c-2 1.5-3 4-3 7v3h3"/></svg><span>МЕНЮ</span></button>
+  <button class="tab" role="tab" aria-controls="p3"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17"/></svg><span>СПИСКИ</span></button>
   <button class="tab" role="tab" aria-controls="p2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>НАСТРОЙКИ</span></button>
 </nav>
 
@@ -325,11 +379,15 @@ const fb = (async () => {
   const [{ initializeApp }, fs] = await Promise.all([import(FB + "firebase-app.js"), import(FB + "firebase-firestore.js")]);
   // кэш на телефоне: приложение открывается сразу с последним известным состоянием, даже без сети
   const db = fs.initializeFirestore(initializeApp(FIREBASE), { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
-  return { ref: id => fs.doc(db, "app", id), set: fs.setDoc, watch: fs.onSnapshot };
+  return { ref: id => fs.doc(db, "app", id), set: fs.setDoc, watch: fs.onSnapshot,
+    // элемент дописывается/убирается в массиве на сервере: одновременные правки двух людей не перетирают друг друга
+    replace: (id, data) => fs.setDoc(fs.doc(db, "app", id), data, { mergeFields: Object.keys(data) }),
+    edit: (id, field, op, item) => fs.setDoc(fs.doc(db, "app", id), { [field]: op === "add" ? fs.arrayUnion(item) : fs.arrayRemove(item) }, { merge: true }) };
 })();
 // без сети Firestore держит запись в очереди и отправит сам, но ждать этого кнопкой не будем
-const write = async (id, data) => { const f = await fb;
-  await Promise.race([f.set(f.ref(id), data), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000))]); };
+const timeout = () => new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000));
+const write = async (id, data) => { const f = await fb; await Promise.race([f.set(f.ref(id), data), timeout()]); };
+const edit = async (id, field, op, item) => { const f = await fb; await Promise.race([f.edit(id, field, op, item), timeout()]); };
 
 function showErr(t) { $("msg").textContent = t; $("msg").hidden = false; }
 
@@ -345,8 +403,8 @@ const pushPrefs = () => { try { return JSON.parse(localStorage.getItem("posuda-p
 function pushNote(t) { $("pushNote").textContent = t; $("pushNote").hidden = !t; }
 function renderPush() {
   const p = pushPrefs();
-  $("pushRem").checked = !!p.reminders; $("pushNews").checked = !!p.news;
-  $("pushRem").disabled = $("pushNews").disabled = !pushOk;
+  $("pushRem").checked = !!p.reminders; $("pushNews").checked = !!p.news; $("pushTodo").checked = !!p.todo; $("pushReady").checked = !!p.ready;
+  $("pushRem").disabled = $("pushNews").disabled = $("pushTodo").disabled = $("pushReady").disabled = !pushOk;
   if (!pushOk) {
     const ios = /iPhone|iPad/.test(navigator.userAgent), home = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
     pushNote(ios && !home ? "На iPhone сначала добавьте сайт на экран «Домой» (инструкция ниже) и откройте его оттуда — там появятся уведомления."
@@ -361,13 +419,14 @@ async function setPush(kind, on) {
     if (perm && await perm !== "granted") throw new Error("denied");
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
-    if (!sub && (p.news || p.reminders))
+    const any = p.news || p.reminders || p.todo || p.ready;
+    if (!sub && any)
       sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(atob(PUSH_KEY.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)) });
     if (sub) {
       const r = await fetch(PUSH + "/subscribe", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sub: sub.toJSON(), news: !!p.news, reminders: !!p.reminders }) });
+        body: JSON.stringify({ sub: sub.toJSON(), news: !!p.news, reminders: !!p.reminders, todo: !!p.todo, ready: !!p.ready }) });
       if (!r.ok) throw new Error("server");
-      if (!p.news && !p.reminders) await sub.unsubscribe();
+      if (!any) await sub.unsubscribe();
     }
     try { localStorage.setItem("posuda-push", JSON.stringify(p)); } catch {}
     pushNote("");
@@ -379,6 +438,8 @@ async function setPush(kind, on) {
 }
 $("pushRem").onchange = e => setPush("reminders", e.target.checked);
 $("pushNews").onchange = e => setPush("news", e.target.checked);
+$("pushTodo").onchange = e => setPush("todo", e.target.checked);
+$("pushReady").onchange = e => setPush("ready", e.target.checked);
 renderPush();
 
 async function save(patch) {
@@ -558,6 +619,7 @@ function renderMenu() {
     return el("div", { className: "cat" }, ...(c.dishes.length ? [] : [head]), form, chips);
   }));
   $("clearWeek").disabled = !Object.values(menu.week).some(l => l.length);
+  renderToday();
 
   $("who").hidden = !!me; $("meLine").hidden = !me; $("meName").textContent = me;
   // имена, которые уже встречаются в меню, — чтобы на втором телефоне не набирать заново
@@ -601,12 +663,106 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) rend
 renderMenu();
 
 
-// вкладки: #menu и #settings в адресе открывают их сразу (удобно для закладки)
-const HASHES = ["", "#menu", "#settings"];
+// Списки: покупки и дела. Элемент хранится как есть: arrayRemove на сервере сравнивает его целиком.
+// ponytail: напоминание о деле — в 10:00 выбранного дня; своё время напоминания не выбирается
+var lists = { shop: [], todo: [], ready: null };
+const okItem = (v, todo) => v && typeof v === "object" && typeof v.id === "string" && typeof v.t === "string" && v.t.trim()
+  && (!todo || typeof v.date === "string");
+const cleanLists = d => ({ shop: (Array.isArray(d?.shop) ? d.shop : []).filter(v => okItem(v)),
+  todo: (Array.isArray(d?.todo) ? d.todo : []).filter(v => okItem(v, true)),
+  ready: typeof d?.ready?.at === "number" ? { at: d.ready.at, by: String(d.ready.by || "").slice(0, 20), text: String(d.ready.text || "").slice(0, 200),
+    dishes: Object.fromEntries(Object.entries(d.ready.dishes || {}).filter(([, v]) => typeof v === "number")) } : null });
+const newId = () => Math.random().toString(36).slice(2, 10);
+const REMINDS = [[1, "Напомнить накануне"], [0, "В тот же день"], [2, "За 2 дня"], [-1, "Не напоминать"]];
+const remindText = r => ({ 0: "напомним в этот день", 1: "напомним накануне", 2: "напомним за 2 дня" })[r] || "";
+const fmtDate = s => new Date(s + "T12:00").toLocaleDateString("ru", { weekday: "short", day: "numeric", month: "long" });
+let todoRemind = 1;
+
+function listEdit(field, op, item) {
+  // сразу на экране, база догонит
+  lists = { ...lists, [field]: op === "add" ? [...lists[field], item] : lists[field].filter(x => x !== item) };
+  renderLists();
+  edit("lists", field, op, item).catch(() => showErr("Нет связи с базой. Список сохранится, когда появится интернет."));
+}
+const toggleDone = (field, it) => { listEdit(field, "del", it); listEdit(field, "add", { ...it, done: !it.done }); };
+
+function itemRow(field, it) {
+  const check = el("button", { type: "button", className: "check", ariaLabel: (it.done ? "Вернуть: " : "Готово: ") + it.t });
+  check.onclick = () => toggleDone(field, it);
+  const meta = [it.by, it.date ? fmtDate(it.date) : "", it.date && !it.done ? remindText(it.remind) : ""].filter(Boolean).join(" · ");
+  const body = el("div", { className: "item-body" }, el("span", { className: "item-t", textContent: it.t }));
+  if (meta) body.append(el("small", { textContent: meta }));
+  const x = el("button", { type: "button", className: "item-x", textContent: "×", ariaLabel: "Удалить: " + it.t });
+  x.onclick = () => listEdit(field, "del", it);
+  return el("div", { className: "item" + (it.done ? " done" : "") }, check, body, x);
+}
+
+function renderLists() {
+  const shop = [...lists.shop.filter(i => !i.done), ...lists.shop.filter(i => i.done)];
+  $("shopList").replaceChildren(...(shop.length ? shop.map(i => itemRow("shop", i)) : [el("p", { className: "empty", textContent: "Пока ничего не нужно." })]));
+  $("clearBought").disabled = !lists.shop.some(i => i.done);
+  // дела по дате, без даты — в конце, сделанные — внизу
+  const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
+  const todo = [...lists.todo.filter(i => !i.done).sort(byDate), ...lists.todo.filter(i => i.done)];
+  $("todoList").replaceChildren(...(todo.length ? todo.map(i => itemRow("todo", i)) : [el("p", { className: "empty", textContent: "Дел нет." })]));
+  $("todoRemind").replaceChildren(...REMINDS.map(([v, l]) => {
+    const b = el("button", { type: "button", className: "chip", textContent: l, ariaPressed: String(v === todoRemind) });
+    b.onclick = () => { todoRemind = v; renderLists(); };
+    return b;
+  }));
+}
+
+$("shopForm").onsubmit = e => {
+  e.preventDefault();
+  const t = $("shopInput").value.trim().slice(0, 60);
+  $("shopInput").value = "";
+  if (t) listEdit("shop", "add", { id: newId(), t, by: me, done: false });
+};
+$("clearBought").onclick = () => lists.shop.filter(i => i.done).forEach(i => listEdit("shop", "del", i));
+$("todoForm").onsubmit = e => {
+  e.preventDefault();
+  const t = $("todoInput").value.trim().slice(0, 80);
+  if (!t) return;
+  listEdit("todo", "add", { id: newId(), t, by: me, done: false, date: $("todoDate").value || "", remind: $("todoDate").value ? todoRemind : -1 });
+  $("todoInput").value = ""; $("todoDate").value = "";
+};
+renderLists();
+
+
+// «Еда готова»: у каждого блюда дня своя кнопка, уведомление всем рассылает сервер
+// объявления function, а не const: renderMenu рисует «Сегодня» раньше, чем выполнится этот код
+function todayPicks() { return (menu.week[DAYS[(new Date().getDay() + 6) % 7][0]] || []).map(p => p.d); }
+function isToday(ms) { return !!ms && new Date(ms).toDateString() === new Date().toDateString(); }
+function readyRow(dish, at) {
+  const b = el("button", { className: "chip", textContent: at ? "Позвать ещё раз" : dish ? "Готово" : "Еда готова" });
+  b.onclick = () => callReady(dish);
+  const body = el("div", { className: "item-body" }, el("span", { className: "item-t", textContent: dish || "Блюда на сегодня не выбраны" }));
+  if (at) body.append(el("small", { textContent: `готово в ${hm(at)}` }));
+  return el("div", { className: "item" }, body, b);
+}
+function renderToday() {
+  const picks = todayPicks(), r = lists?.ready, done = r?.dishes || {};
+  $("readyNote").textContent = r && isToday(r.at) ? `звали в ${hm(r.at)}${r.by ? " · " + r.by : ""}` : "";
+  // блюда не выбраны — просто позвать к столу
+  $("todayList").replaceChildren(...(picks.length ? picks.map(d => readyRow(d, isToday(done[d]) ? done[d] : 0)) : [readyRow("", 0)]));
+}
+async function callReady(dish) {
+  const at = Date.now();
+  // отметки готовности храним только за сегодня
+  const dishes = Object.fromEntries(Object.entries(lists?.ready?.dishes || {}).filter(([, v]) => isToday(v)));
+  if (dish) dishes[dish] = at;
+  const ready = { at, by: me, text: dish, dishes };
+  lists = { ...lists, ready }; renderToday();
+  try { const f = await fb; await Promise.race([f.replace("lists", { ready }), timeout()]); ping(); }
+  catch { showErr("Нет связи с базой. Проверьте интернет и нажмите ещё раз."); }
+}
+
+// вкладки: #menu, #lists и #settings в адресе открывают их сразу (удобно для закладки)
+const HASHES = ["", "#menu", "#lists", "#settings"];
 const tabs = [...document.querySelectorAll(".tab")];
 function showTab(i) {
   tabs.forEach((t, j) => t.setAttribute("aria-selected", j === i));
-  ["p0", "p1", "p2"].forEach((id, j) => $(id).hidden = i !== j);
+  ["p0", "p1", "p3", "p2"].forEach((id, j) => $(id).hidden = i !== j);
   $("ind").style.transform = `translateX(${i * 100}%)`;
   history.replaceState(null, "", HASHES[i] || location.pathname + location.search);
 }
@@ -626,6 +782,7 @@ fb.then(f => {
     if (!s.metadata.fromCache) $("msg").hidden = true;
   }, lost);
   f.watch(f.ref("menu"), s => { const m = cleanMenu(s.data()); if (m) { menu = m; renderMenu(); } }, lost);
+  f.watch(f.ref("lists"), s => { lists = cleanLists(s.data()); renderLists(); renderToday(); }, lost);
 }).catch(lost);
 </script>
 </body>
