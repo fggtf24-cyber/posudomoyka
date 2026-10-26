@@ -233,14 +233,6 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
   </section>
 
   <section>
-    <p class="label">Через приложение ntfy</p>
-    <ol>
-      <li>Установите бесплатное приложение ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a></li>
-      <li>В ntfy нажмите «+» и введите тему: <code id="topic"></code> <button class="chip" id="copy">Скопировать</button></li>
-    </ol>
-  </section>
-
-  <section>
     <p class="label">На экран «Домой»</p>
     <ol>
       <li>iPhone, Safari: «Поделиться» → «На экран „Домой"».</li>
@@ -268,8 +260,6 @@ main { padding-bottom: calc(var(--bar-h) + 48px); }
 </nav>
 
 <script>
-// ponytail: тема лежит в публичном коде, любой, кто её прочтёт, может слать в неё сообщения. Для посудомойки норм; если начнут баловаться — свой ntfy-сервер с паролем.
-const TOPIC = "posuda-978f310f6fe058ed", NTFY = "https://ntfy.sh";
 // Отметки и меню лежат в Firestore. Ключи веб-приложения Firebase публичные по задумке, доступ ограничивают правила из firestore.rules.
 const FIREBASE = {
   apiKey: "AIzaSyCVaEYmgJRPpNAxb0jjDhFiF0Mfe5sh-Nc",
@@ -280,7 +270,6 @@ const FIREBASE = {
   appId: "1:130024335446:web:0d3eb3993e83228392f3f7",
 };
 const UNLOAD_BY = 17, LOAD_BY = 20, WINDOW = 2 * 3600e3;
-const URL_SELF = location.origin + location.pathname;
 const $ = id => document.getElementById(id);
 let state = {}, busy = false;
 
@@ -329,27 +318,6 @@ function render() {
   $("g2").parentElement.hidden = !c.unloadedAt; // пустая шкала до разгрузки выглядит как лишняя линия
   $("b2").hidden = !!c.loadedAt; $("b2").disabled = busy || !c.unloadedAt;
   $("u2").hidden = !c.loadedAt; $("u2").disabled = busy;
-}
-
-const post = body => fetch(NTFY + "/", { method: "POST", body: JSON.stringify(body) })
-  .then(r => { if (!r.ok) throw new Error(r.status); });
-// уведомления не критичны: если не ушли, отметка всё равно сохранена
-const notify = n => post({ topic: TOPIC, click: URL_SELF, ...n }).catch(() => {});
-// удаление по sequence_id убирает уведомление с телефонов и отменяет ещё не отправленное
-const unsend = (key, date) => fetch(`${NTFY}/${TOPIC}/${seq(key, date)}`, { method: "DELETE" }).catch(() => {});
-const seq = (key, date = cur().date) => `${key}-${date}`;
-
-// Напоминание о разгрузке не привязано к кнопке, поэтому ставим его заранее на сегодня и 2 дня вперёд
-// (ntfy.sh держит отложенные сообщения до 3 дней). ponytail: если 3 дня никто не открывал приложение — напоминаний не будет.
-async function scheduleUnloadReminders() {
-  for (const off of [0, 1, 2]) {
-    const d = new Date(); d.setDate(d.getDate() + off); d.setHours(UNLOAD_BY, 0, 0, 0);
-    const when = +d - 15 * 60e3, date = d.toLocaleDateString("sv");
-    if (when < Date.now() + 60e3 || (off === 0 && cur().unloadedAt)) continue;
-    await unsend("unloadremind", date); // без дублей при повторном открытии
-    await notify({ title: "Через 15 минут срок разгрузки", message: `Посудомойку надо разгрузить до ${UNLOAD_BY}:00.`,
-      tags: ["alarm_clock"], delay: String(Math.floor(when / 1000)), sequence_id: seq("unloadremind", date) });
-  }
 }
 
 const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
@@ -413,38 +381,21 @@ $("pushRem").onchange = e => setPush("reminders", e.target.checked);
 $("pushNews").onchange = e => setPush("news", e.target.checked);
 renderPush();
 
-async function save(patch, after) {
+async function save(patch) {
   busy = true; render();
   const next = { ...cur(), ...patch };
   try {
     await write("dishwasher", next);
     state = next; $("msg").hidden = true;
-    ping();
-    await after?.(next);
-  } catch { showErr("Нет связи с базой. Отметка сохранится, когда появится интернет, но уведомления не ушли."); }
+    ping(); // уведомления рассылает сервер на Cloudflare
+  } catch { showErr("Нет связи с базой. Отметка сохранится, когда появится интернет."); }
   busy = false; render();
 }
 
-$("b1").onclick = () => save({ unloadedAt: Date.now(), loadedAt: null }, async c => {
-  const d = due(c), remind = Math.floor(d / 1000) - 15 * 60;
-  await unsend("unloadremind");
-  await notify({ title: "Посудомойку разгрузили", message: `Загрузи до ${hm(d)}. Таймер пошёл.`, tags: ["white_check_mark"], sequence_id: seq("unload") });
-  if (remind * 1000 > Date.now() + 60e3)
-    await notify({ title: "Через 15 минут срок загрузки", message: "Посудомойка ждёт загрузки.", tags: ["alarm_clock"], delay: String(remind), sequence_id: seq("remind") });
-});
-$("u1").onclick = () => save({ unloadedAt: null }, async () => {
-  await unsend("unload"); await unsend("remind");
-  await notify({ title: "Отбой", message: "Посудомойку ещё не разгрузили, отметку отменили.", tags: ["x"] });
-  await scheduleUnloadReminders();
-});
-$("b2").onclick = () => save({ loadedAt: Date.now() }, async () => {
-  await unsend("remind");
-  await notify({ title: "Посудомойку загрузили", message: "На сегодня всё.", tags: ["tada"], sequence_id: seq("load") });
-});
-$("u2").onclick = () => save({ loadedAt: null }, async () => {
-  await unsend("load");
-  await notify({ title: "Отбой", message: "Посудомойку ещё не загрузили, отметку отменили.", tags: ["x"] });
-});
+$("b1").onclick = () => save({ unloadedAt: Date.now(), loadedAt: null });
+$("u1").onclick = () => save({ unloadedAt: null });
+$("b2").onclick = () => save({ loadedAt: Date.now() });
+$("u2").onclick = () => save({ loadedAt: null });
 
 // Меню на неделю: на каждый день можно выбрать несколько блюд, видно всем.
 const DAYS = [["mon", "Пн"], ["tue", "Вт"], ["wed", "Ср"], ["thu", "Чт"], ["fri", "Пт"], ["sat", "Сб"], ["sun", "Вс"]];
@@ -649,11 +600,6 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) rend
 
 renderMenu();
 
-$("topic").textContent = TOPIC;
-$("copy").onclick = async () => {
-  try { await navigator.clipboard.writeText(TOPIC); $("copy").textContent = "Скопировано"; }
-  catch { getSelection().selectAllChildren($("topic")); }
-};
 
 // вкладки: #menu и #settings в адресе открывают их сразу (удобно для закладки)
 const HASHES = ["", "#menu", "#settings"];
@@ -671,15 +617,13 @@ addEventListener("hashchange", tabFromHash);
 
 render();
 setInterval(render, 1000);
-let scheduled = false;
 const lost = () => showErr("Нет связи с базой. Проверьте интернет и откройте приложение заново.");
 fb.then(f => {
   f.watch(f.ref("dishwasher"), { includeMetadataChanges: true }, s => {
     const d = s.data();
     if (d && typeof d.date === "string") state = d;
     render();
-    // напоминания ставим, только когда знаем свежее состояние с сервера, а не из кэша
-    if (!s.metadata.fromCache) { $("msg").hidden = true; if (!scheduled) { scheduled = true; scheduleUnloadReminders(); } }
+    if (!s.metadata.fromCache) $("msg").hidden = true;
   }, lost);
   f.watch(f.ref("menu"), s => { const m = cleanMenu(s.data()); if (m) { menu = m; renderMenu(); } }, lost);
 }).catch(lost);
