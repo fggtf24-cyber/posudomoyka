@@ -469,8 +469,8 @@ function cleanMenu(m) {
   const str = v => typeof v === "string" ? v.trim().slice(0, 40) : "";
   const list = v => [...new Set((Array.isArray(v) ? v : [v]).map(str).filter(Boolean))];
   const cats = (Array.isArray(m.cats) ? m.cats : []).map(c => ({ name: str(c?.name).slice(0, 30), dishes: list(c?.dishes).slice(0, 100) }));
-  // день — список {d: блюдо, by: кто выбрал}
-  const picks = v => (Array.isArray(v) ? v : []).map(p => ({ d: str(p?.d), by: str(p?.by).slice(0, 20) }))
+  // день — список {d: блюдо, by: кто выбрал}; одно блюдо могут выбрать несколько человек — ники через запятую
+  const picks = v => (Array.isArray(v) ? v : []).map(p => ({ d: str(p?.d), by: str(p?.by).slice(0, 60) }))
     .filter((p, i, a) => p.d && a.findIndex(q => q.d === p.d) === i).slice(0, 8);
   // weekOf — понедельник недели, к которой относятся выборы; лежит внутри week, чтобы не менять правила базы.
   // Нет пометки (данные до автоочистки) — считаем текущей неделей.
@@ -482,8 +482,9 @@ const emptyWeek = () => Object.fromEntries(DAYS.map(([k]) => [k, []]));
 // ponytail: имя просто запоминается на телефоне, без пароля — назваться можно кем угодно. Нужна защита — вход по почте через Firebase Auth.
 const NAME_KEY = "posuda-name";
 let me = ""; try { me = localStorage.getItem(NAME_KEY) || ""; } catch {}
+const names = by => by.split(",").map(n => n.trim()).filter(Boolean);
 function setMe(n) {
-  me = n.trim().slice(0, 20);
+  me = n.replace(/,/g, "").trim().slice(0, 20); // запятая разделяет ники у блюда
   try { me ? localStorage.setItem(NAME_KEY, me) : localStorage.removeItem(NAME_KEY); } catch {}
   renderMenu();
 }
@@ -531,7 +532,10 @@ function togglePick(d) {
   if (!d) return;
   const on = chosen.find(p => p.d.toLowerCase() === d.toLowerCase());
   if (!on && chosen.length >= 8) return;
-  saveMenu({ week: { ...menu.week, [pickDay]: on ? chosen.filter(p => p !== on) : [...chosen, { d, by: me }] } });
+  if (!on) return saveMenu({ week: { ...menu.week, [pickDay]: [...chosen, { d, by: me }] } });
+  // блюдо уже выбрано: нажатие добавляет или убирает только свой ник, блюдо уходит вместе с последним ником
+  const who = names(on.by), next = who.includes(me) ? who.filter(n => n !== me) : [...who, me];
+  saveMenu({ week: { ...menu.week, [pickDay]: next.length ? chosen.map(p => p === on ? { d: p.d, by: next.join(", ") } : p) : chosen.filter(p => p !== on) } });
 }
 function renderPick() {
   if (!pickDay) return;
@@ -549,8 +553,9 @@ function renderPick() {
     : (menu.cats[sel]?.dishes || []).map(d => [d, sel]);
   const full = chosen.length >= 8;
   const btns = list.map(([d, ci]) => {
-    const on = chosen.some(p => p.d === d);
-    const b = el("button", { type: "button", className: "pick", ariaPressed: String(on), disabled: full && !on, textContent: d });
+    const p = chosen.find(p => p.d === d), on = !!p && names(p.by).includes(me);
+    // выбрал кто-то другой — видно кто, нажатие добавит ваш ник рядом
+    const b = el("button", { type: "button", className: "pick", ariaPressed: String(on), disabled: full && !p, textContent: p && !on ? `${d} · ${p.by}` : d });
     b.style.setProperty("--c", catColor(ci));
     b.onclick = () => togglePick(d);
     return b;
@@ -626,7 +631,7 @@ function renderMenu() {
 
   $("who").hidden = !!me; $("meLine").hidden = !me; $("meName").textContent = me;
   // имена, которые уже встречаются в меню, — чтобы на втором телефоне не набирать заново
-  const known = [...new Set(Object.values(menu.week).flat().map(p => p.by).filter(Boolean))];
+  const known = [...new Set(Object.values(menu.week).flat().flatMap(p => names(p.by)))];
   $("names").replaceChildren(...known.map(n => {
     const b = el("button", { type: "button", className: "chip", textContent: n });
     b.onclick = () => setMe(n);
