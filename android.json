@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "3.0",
-  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.0/posudomoyka.apk",
-  "notes": "Можно выбирать блюда на следующую неделю — в выходные она раскрыта сама."
+  "versionCode": 13,
+  "versionName": "3.1",
+  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.1/posudomoyka.apk",
+  "notes": "Кнопка «Готово» в выборе блюда снова нормального размера."
 }
