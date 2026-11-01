@@ -474,10 +474,19 @@ function cleanMenu(m) {
     .filter((p, i, a) => p.d && a.findIndex(q => q.d === p.d) === i).slice(0, 8);
   // weekOf — понедельник недели, к которой относятся выборы; лежит внутри week, чтобы не менять правила базы.
   // Нет пометки (данные до автоочистки) — считаем текущей неделей.
-  return { week: Object.fromEntries(DAYS.map(([k]) => [k, picks(m.week?.[k])])), cats: cats.filter(c => c.name).slice(0, 30),
+  // next — следующая неделя (тоже внутри week): в понедельник она становится текущей
+  const days = w => Object.fromEntries(DAYS.map(([k]) => [k, picks(w?.[k])]));
+  return { week: days(m.week), next: days(m.week?.next), cats: cats.filter(c => c.name).slice(0, 30),
     weekOf: str(m.week?.weekOf) || mondayOf() };
 }
-const mondayOf = () => { const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.toLocaleDateString("sv"); };
+// понедельник этой недели (add = 7 — следующей), YYYY-MM-DD
+const mondayOf = (add = 0) => { const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7 + add); return d.toLocaleDateString("sv"); };
+// день текущей недели — "mon", следующей — "n:mon"
+const isNext = k => k.startsWith("n:"), dayKey = k => isNext(k) ? k.slice(2) : k;
+const dayOf = k => (isNext(k) ? menu.next : menu.week)[dayKey(k)];
+const setDay = (k, list) => saveMenu(isNext(k) ? { next: { ...menu.next, [dayKey(k)]: list } } : { week: { ...menu.week, [k]: list } });
+const dayDate = k => { const d = new Date(mondayOf(isNext(k) ? 7 : 0) + "T12:00"); d.setDate(d.getDate() + DAYS.findIndex(([x]) => x === dayKey(k)));
+  return d.toLocaleDateString("ru", { day: "numeric", month: "long" }); };
 const emptyWeek = () => Object.fromEntries(DAYS.map(([k]) => [k, []]));
 // ponytail: имя просто запоминается на телефоне, без пароля — назваться можно кем угодно. Нужна защита — вход по почте через Firebase Auth.
 const NAME_KEY = "posuda-name";
@@ -528,19 +537,19 @@ function closePick() {
   setTimeout(() => { if (!pickDay) $("pick").hidden = true; }, 300); // ждём, пока панель уедет вниз
 }
 function togglePick(d) {
-  const chosen = menu.week[pickDay];
+  const chosen = dayOf(pickDay);
   if (!d) return;
   const on = chosen.find(p => p.d.toLowerCase() === d.toLowerCase());
   if (!on && chosen.length >= 8) return;
-  if (!on) return saveMenu({ week: { ...menu.week, [pickDay]: [...chosen, { d, by: me }] } });
+  if (!on) return setDay(pickDay, [...chosen, { d, by: me }]);
   // блюдо уже выбрано: нажатие добавляет или убирает только свой ник, блюдо уходит вместе с последним ником
   const who = names(on.by), next = who.includes(me) ? who.filter(n => n !== me) : [...who, me];
-  saveMenu({ week: { ...menu.week, [pickDay]: next.length ? chosen.map(p => p === on ? { d: p.d, by: next.join(", ") } : p) : chosen.filter(p => p !== on) } });
+  setDay(pickDay, next.length ? chosen.map(p => p === on ? { d: p.d, by: next.join(", ") } : p) : chosen.filter(p => p !== on));
 }
 function renderPick() {
   if (!pickDay) return;
-  const chosen = menu.week[pickDay], typed = $("pickSearch").value.trim(), q = typed.toLowerCase();
-  $("pickTitle").textContent = `Блюда на ${DAY_NAMES[pickDay]}` + (chosen.length ? ` · ${chosen.length}` : "");
+  const chosen = dayOf(pickDay), typed = $("pickSearch").value.trim(), q = typed.toLowerCase();
+  $("pickTitle").textContent = `Блюда на ${DAY_NAMES[dayKey(pickDay)]}, ${dayDate(pickDay)}` + (chosen.length ? ` · ${chosen.length}` : "");
   const sel = Math.max(0, menu.cats.findIndex(c => c.name === pickCat));
   $("pickCats").hidden = !!q;
   $("pickCats").replaceChildren(...menu.cats.map((c, ci) => {
@@ -570,29 +579,33 @@ function renderPick() {
   $("pickFull").hidden = !full;
 }
 
-let showPast = false;
+let showPast = false, showNext = null; // null — следующая неделя раскрыта сама в субботу и воскресенье
 function renderMenu() {
-  // началась новая неделя — старые выборы не показываем, база перезапишется при первом выборе
-  if (menu.weekOf !== mondayOf()) menu = { ...menu, week: emptyWeek(), weekOf: mondayOf() };
+  // началась новая неделя — следующая становится текущей (если её планировали), база перезапишется при первом выборе
+  if (menu.weekOf !== mondayOf()) menu = { ...menu, week: menu.weekOf === mondayOf(-7) ? menu.next : emptyWeek(), next: emptyWeek(), weekOf: mondayOf() };
   const t = (new Date().getDay() + 6) % 7;
-  const setDay = (k, list) => saveMenu({ week: { ...menu.week, [k]: list } });
-  const rows = DAYS.map(([k, name], i) => {
-    const chosen = menu.week[k];
+  const dayRow = (k, name, today) => {
+    const chosen = dayOf(k);
     // выбирать можно, только представившись
     const add = el("button", { type: "button", id: "m-" + k, className: "chip add-dish", disabled: !me, textContent: "+ блюдо" });
     add.onclick = () => openPick(k);
     const cell = document.createElement("div"); cell.className = "chips";
     cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), add);
     const lab = document.createElement("label"); lab.htmlFor = add.id; lab.textContent = name;
-    const row = document.createElement("div"); row.className = "day" + (i === t ? " today" : ""); row.append(lab, cell);
+    const row = document.createElement("div"); row.className = "day" + (today ? " today" : ""); row.append(lab, cell);
     return row;
-  });
+  };
+  const rows = DAYS.map(([k, name], i) => dayRow(k, name, i === t));
   // прошедшие дни недели свёрнуты в одну строку, чтобы к выходным не листать
   const pastCount = DAYS.slice(0, t).reduce((n, [k]) => n + menu.week[k].length, 0);
   const toggle = el("button", { type: "button", className: "linkbtn past-toggle", hidden: t === 0,
     textContent: showPast ? "Скрыть прошедшие дни" : `Прошедшие дни: ${DAYS[0][1]}${t > 1 ? "–" + DAYS[t - 1][1] : ""} · блюд: ${pastCount}` });
   toggle.onclick = () => { showPast = !showPast; renderMenu(); };
-  $("week").replaceChildren(toggle, ...(showPast ? rows : rows.slice(t)));
+  const nextOpen = showNext ?? t >= 5, nextCount = Object.values(menu.next).flat().length;
+  const nextToggle = el("button", { type: "button", className: "linkbtn past-toggle",
+    textContent: nextOpen ? `Следующая неделя, с ${dayDate("n:mon")} — скрыть` : `Следующая неделя, с ${dayDate("n:mon")}` + (nextCount ? ` · блюд: ${nextCount}` : "") });
+  nextToggle.onclick = () => { showNext = !nextOpen; renderMenu(); };
+  $("week").replaceChildren(toggle, ...(showPast ? rows : rows.slice(t)), nextToggle, ...(nextOpen ? DAYS.map(([k, name]) => dayRow("n:" + k, name, false)) : []));
   renderPick();
   const setCat = (ci, patch) => saveMenu({ cats: menu.cats.map((c, j) => j === ci ? { ...c, ...patch } : c) });
   // видна одна категория — та, что выбрана кнопкой сверху
@@ -631,7 +644,7 @@ function renderMenu() {
 
   $("who").hidden = !!me; $("meLine").hidden = !me; $("meName").textContent = me;
   // имена, которые уже встречаются в меню, — чтобы на втором телефоне не набирать заново
-  const known = [...new Set(Object.values(menu.week).flat().flatMap(p => names(p.by)))];
+  const known = [...new Set([...Object.values(menu.week), ...Object.values(menu.next)].flat().flatMap(p => names(p.by)))];
   $("names").replaceChildren(...known.map(n => {
     const b = el("button", { type: "button", className: "chip", textContent: n });
     b.onclick = () => setMe(n);
@@ -641,7 +654,7 @@ function renderMenu() {
 
 function saveMenu(patch) {
   menu = { ...menu, ...patch }; renderMenu();
-  write("menu", { cats: menu.cats, week: { ...menu.week, weekOf: menu.weekOf } }).then(() => $("msg").hidden = true, e => dbErr(e, "Нет связи с базой. Меню сохранится, когда появится интернет."));
+  write("menu", { cats: menu.cats, week: { ...menu.week, weekOf: menu.weekOf, next: menu.next } }).then(() => $("msg").hidden = true, e => dbErr(e, "Нет связи с базой. Меню сохранится, когда появится интернет."));
 }
 
 $("nameForm").onsubmit = e => { e.preventDefault(); if ($("nameInput").value.trim()) setMe($("nameInput").value); };
