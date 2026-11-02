@@ -136,6 +136,12 @@ button.pick.own { --c: var(--stone); }
 .cat { display: grid; gap: 10px; }
 .cat .chips, .cat .add { margin-top: 0; }
 #addCat { margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--sand); }
+/* плашка блюда дня: нажатие на название присоединяет к выбору */
+.chips button.join { padding: 0; color: var(--ink); font: inherit; letter-spacing: 0; text-transform: none; text-align: left; }
+/* перетаскивание блюда: копия едет за пальцем, день под пальцем подсвечен */
+.day.drop { background: var(--sand); border-radius: 12px; }
+.chips.ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; transform: scale(1.06); filter: drop-shadow(0 6px 10px rgba(17, 17, 17, .25)); }
+.chips span.dragging { opacity: .3; }
 .chips span small { margin-left: 6px; color: var(--grey); font-size: .74rem; letter-spacing: .04em; }
 #who .chips, #who .add { margin-top: 0; }
 button.linkbtn { background: none; border: 0; padding: 0; font: inherit; letter-spacing: 0; text-transform: none; color: var(--ink);
@@ -510,13 +516,20 @@ const findDish = name => menu.cats.find(c => c.dishes.some(d => d.toLowerCase() 
 const CAT_COLORS = ["#c9a24f", "#b97c5f", "#87986a", "#7b94a6", "#9b7b92", "#6f978e", "#a8916f"];
 const catColor = ci => ci < 0 ? "" : CAT_COLORS[ci % CAT_COLORS.length];
 const dishColor = d => catColor(menu.cats.indexOf(findDish(d)));
+// блюда дня по порядку списка блюд: сначала категория (завтраки, супы…), внутри — как в категории; вписанные вручную — в конце
+const dishOrder = d => { const ci = menu.cats.indexOf(findDish(d));
+  return ci < 0 ? 1e6 : ci * 1000 + menu.cats[ci].dishes.findIndex(x => x.toLowerCase() === d.toLowerCase()); };
+const sortPicks = list => [...list].sort((a, b) => dishOrder(a.d) - dishOrder(b.d));
 
-function chip(text, onRemove, note, color) {
+function chip(text, onRemove, note, color, join) {
   const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.ariaLabel = "Убрать " + text;
   x.onclick = onRemove;
-  const c = document.createElement("span"); c.append(text);
+  const c = document.createElement("span");
+  // join — нажатие на само блюдо: {label, onclick, disabled}
+  const body = join ? el("button", { type: "button", className: "join", ariaLabel: join.label, disabled: join.disabled }, text) : c;
+  if (join) { body.onclick = join.onclick; c.append(body); } else c.append(text);
   if (color) { c.className = "tinted"; c.style.setProperty("--c", color); }
-  if (note) c.append(el("small", { textContent: note }));
+  if (note) body.append(el("small", { textContent: note }));
   c.append(x);
   return c;
 }
@@ -536,15 +549,15 @@ function closePick() {
   $("pick").classList.remove("open");
   setTimeout(() => { if (!pickDay) $("pick").hidden = true; }, 300); // ждём, пока панель уедет вниз
 }
-function togglePick(d) {
-  const chosen = dayOf(pickDay);
+function togglePick(d, k = pickDay) {
+  const chosen = dayOf(k);
   if (!d) return;
   const on = chosen.find(p => p.d.toLowerCase() === d.toLowerCase());
   if (!on && chosen.length >= 8) return;
-  if (!on) return setDay(pickDay, [...chosen, { d, by: me }]);
+  if (!on) return setDay(k, [...chosen, { d, by: me }]);
   // блюдо уже выбрано: нажатие добавляет или убирает только свой ник, блюдо уходит вместе с последним ником
   const who = names(on.by), next = who.includes(me) ? who.filter(n => n !== me) : [...who, me];
-  setDay(pickDay, next.length ? chosen.map(p => p === on ? { d: p.d, by: next.join(", ") } : p) : chosen.filter(p => p !== on));
+  setDay(k, next.length ? chosen.map(p => p === on ? { d: p.d, by: next.join(", ") } : p) : chosen.filter(p => p !== on));
 }
 function renderPick() {
   if (!pickDay) return;
@@ -579,6 +592,72 @@ function renderPick() {
   $("pickFull").hidden = !full;
 }
 
+// перенос блюда на другой день; там оно уже есть — ники объединяются
+function moveDish(from, to, d) {
+  const p = dayOf(from).find(q => q.d === d), target = dayOf(to);
+  if (!p || from === to) return;
+  const same = target.find(q => q.d.toLowerCase() === d.toLowerCase());
+  if (!same && target.length >= 8) return showErr("В этот день уже 8 блюд — уберите одно, чтобы перенести другое.");
+  const lists = { [from]: dayOf(from).filter(q => q !== p),
+    [to]: same ? target.map(q => q === same ? { d: q.d, by: [...new Set([...names(q.by), ...names(p.by)])].join(", ") } : q) : [...target, p] };
+  const week = { ...menu.week }, next = { ...menu.next };
+  for (const [k, l] of Object.entries(lists)) (isNext(k) ? next : week)[dayKey(k)] = l;
+  saveMenu({ week, next });
+}
+
+// Перетаскивание: задержать палец на блюде (мышью — просто потянуть) и вести на другой день.
+// ponytail: страница сама не прокручивается, пока тащишь, — дальний день сначала прокрутить в вид. Нужно — автопрокрутка у краёв экрана.
+let drag = null, dragClick = false;
+function armDrag(e, k, d, chipEl) {
+  if (e.button > 0 || e.target.closest("button:not(.join)")) return; // крестик — не перетаскивание
+  const a = { k, d, x: e.clientX, y: e.clientY, chipEl, id: e.pointerId };
+  a.timer = setTimeout(() => startDrag(a), e.pointerType === "mouse" ? 1e9 : 350);
+  drag = { armed: a };
+}
+function startDrag(a) {
+  clearTimeout(a.timer);
+  const r = a.chipEl.getBoundingClientRect();
+  const ghost = el("div", { className: "chips ghost" }, a.chipEl.cloneNode(true));
+  document.body.append(ghost);
+  a.chipEl.classList.add("dragging");
+  drag = { ...a, ghost, dx: a.x - r.left, dy: a.y - r.top };
+  navigator.vibrate?.(15);
+  moveGhost(a.x, a.y);
+}
+function moveGhost(x, y) {
+  drag.ghost.style.left = x - drag.dx + "px"; drag.ghost.style.top = y - drag.dy + "px";
+  const row = document.elementFromPoint(x, y)?.closest(".day[data-k]");
+  drag.over = row?.dataset.k;
+  document.querySelectorAll(".day.drop").forEach(r => r !== row && r.classList.remove("drop"));
+  if (row && drag.over !== drag.k) row.classList.add("drop");
+}
+function endDrag(drop) {
+  if (!drag) return;
+  if (drag.armed) { clearTimeout(drag.armed.timer); drag = null; return; }
+  const { k, d, over, ghost, chipEl } = drag;
+  ghost.remove(); chipEl.classList.remove("dragging");
+  document.querySelectorAll(".day.drop").forEach(r => r.classList.remove("drop"));
+  drag = null; dragClick = true; setTimeout(() => dragClick = false, 400); // отпускание не считается нажатием на блюдо
+  if (drop && over && over !== k) moveDish(k, over, d);
+}
+document.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const a = drag.armed;
+  if (a) {
+    const far = Math.hypot(e.clientX - a.x, e.clientY - a.y) > 8;
+    // палец сдвинулся до задержки — это прокрутка; мышь — сразу тащим
+    if (far) e.pointerType === "mouse" ? startDrag(a) : endDrag(false);
+    return;
+  }
+  moveGhost(e.clientX, e.clientY);
+});
+document.addEventListener("pointerup", () => endDrag(true));
+document.addEventListener("pointercancel", () => endDrag(false));
+// пока тащим, страница не прокручивается
+document.addEventListener("touchmove", e => { if (drag && !drag.armed) e.preventDefault(); }, { passive: false });
+document.addEventListener("click", e => { if (dragClick) { e.stopPropagation(); e.preventDefault(); dragClick = false; } }, true);
+document.addEventListener("contextmenu", e => { if (drag) e.preventDefault(); });
+
 let showPast = false, showNext = null; // null — следующая неделя раскрыта сама в субботу и воскресенье
 function renderMenu() {
   // началась новая неделя — следующая становится текущей (если её планировали), база перезапишется при первом выборе
@@ -590,9 +669,15 @@ function renderMenu() {
     const add = el("button", { type: "button", id: "m-" + k, className: "chip add-dish", disabled: !me, textContent: "+ блюдо" });
     add.onclick = () => openPick(k);
     const cell = document.createElement("div"); cell.className = "chips";
-    cell.append(...chosen.map(p => chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d))), add);
+    // нажатие на блюдо — присоединиться к тому, кто его выбрал (или убрать свой ник)
+    cell.append(...sortPicks(chosen).map(p => {
+      const c = chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d),
+        { label: (names(p.by).includes(me) ? "Убрать свой ник: " : "Тоже хочу: ") + p.d, disabled: !me, onclick: () => togglePick(p.d, k) });
+      c.onpointerdown = e => { e.target.releasePointerCapture?.(e.pointerId); armDrag(e, k, p.d, c); };
+      return c;
+    }), add);
     const lab = document.createElement("label"); lab.htmlFor = add.id; lab.textContent = name;
-    const row = document.createElement("div"); row.className = "day" + (today ? " today" : ""); row.append(lab, cell);
+    const row = document.createElement("div"); row.className = "day" + (today ? " today" : ""); row.dataset.k = k; row.append(lab, cell);
     return row;
   };
   const rows = DAYS.map(([k, name], i) => dayRow(k, name, i === t));
@@ -753,7 +838,7 @@ renderLists();
 
 // «Еда готова»: у каждого блюда дня своя кнопка, уведомление всем рассылает сервер
 // объявления function, а не const: renderMenu рисует «Сегодня» раньше, чем выполнится этот код
-function todayPicks() { return (menu.week[DAYS[(new Date().getDay() + 6) % 7][0]] || []).map(p => p.d); }
+function todayPicks() { return sortPicks(menu.week[DAYS[(new Date().getDay() + 6) % 7][0]] || []).map(p => p.d); }
 function isToday(ms) { return !!ms && new Date(ms).toDateString() === new Date().toDateString(); }
 function readyRow(dish, at) {
   const b = el("button", { className: "chip", textContent: at ? "Позвать ещё раз" : dish ? "Готово" : "Еда готова" });
