@@ -1,6 +1,6 @@
 {
-  "versionCode": 15,
-  "versionName": "3.3",
-  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.3/posudomoyka.apk",
-  "notes": "Длинные плашки блюд переносятся аккуратно, крестик не пропадает. Отступ у кнопки «Готово» в блоке «Сегодня»."
+  "versionCode": 16,
+  "versionName": "3.4",
+  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.4/posudomoyka.apk",
+  "notes": "Блюдо удаляется в два нажатия: после × появляется «удалить?»."
 }
