@@ -1,6 +1,6 @@
 {
-  "versionCode": 13,
-  "versionName": "3.1",
-  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.1/posudomoyka.apk",
-  "notes": "Кнопка «Готово» в выборе блюда снова нормального размера."
+  "versionCode": 14,
+  "versionName": "3.2",
+  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.2/posudomoyka.apk",
+  "notes": "Блюда дня по порядку категорий. Нажмите на блюдо — присоединитесь к выбору. Подержите блюдо — перетащите на другой день."
 }
