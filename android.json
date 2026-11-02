@@ -1,6 +1,6 @@
 {
-  "versionCode": 16,
-  "versionName": "3.4",
-  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.4/posudomoyka.apk",
-  "notes": "Блюдо удаляется в два нажатия: после × появляется «удалить?»."
+  "versionCode": 17,
+  "versionName": "3.5",
+  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.5/posudomoyka.apk",
+  "notes": "Выбрали блюдо одни — перед удалением переспросим. Выбрали вместе с кем-то — убирается только ваш ник."
 }
