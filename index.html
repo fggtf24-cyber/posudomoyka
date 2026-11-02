@@ -526,6 +526,7 @@ function chip(text, onRemove, note, color, join) {
   const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.ariaLabel = "Убрать " + text;
   // удаление в два нажатия: × превращается в «удалить?», через 3 секунды без ответа — обратно
   x.onclick = () => {
+    if (join?.leave) return join.onclick(); // блюдо выбрали и вы, и другие — крестик убирает только ваш ник
     if (x.classList.contains("sure")) return onRemove();
     x.classList.add("sure"); x.textContent = "удалить?";
     setTimeout(() => { x.classList.remove("sure"); x.textContent = "×"; }, 3000);
@@ -533,7 +534,8 @@ function chip(text, onRemove, note, color, join) {
   const c = document.createElement("span");
   // join — нажатие на само блюдо: {label, onclick, disabled}
   const body = join ? el("button", { type: "button", className: "join", ariaLabel: join.label, disabled: join.disabled }, text) : c;
-  if (join) { body.onclick = join.onclick; c.append(body); } else c.append(text);
+  // join.removes — нажатие уберёт блюдо целиком (выбрали только вы): спрашиваем так же, как у крестика
+  if (join) { body.onclick = join.removes ? () => x.onclick() : join.onclick; c.append(body); } else c.append(text);
   if (color) { c.className = "tinted"; c.style.setProperty("--c", color); }
   if (note) body.append(el("small", { textContent: note }));
   c.append(x);
@@ -678,7 +680,8 @@ function renderMenu() {
     // нажатие на блюдо — присоединиться к тому, кто его выбрал (или убрать свой ник)
     cell.append(...sortPicks(chosen).map(p => {
       const c = chip(p.d, () => setDay(k, chosen.filter(q => q !== p)), p.by, dishColor(p.d),
-        { label: (names(p.by).includes(me) ? "Убрать свой ник: " : "Тоже хочу: ") + p.d, disabled: !me, onclick: () => togglePick(p.d, k) });
+        { label: (names(p.by).includes(me) ? "Убрать свой ник: " : "Тоже хочу: ") + p.d, disabled: !me, onclick: () => togglePick(p.d, k),
+          removes: names(p.by).length === 1 && names(p.by)[0] === me, leave: names(p.by).length > 1 && names(p.by).includes(me) });
       c.onpointerdown = e => { e.target.releasePointerCapture?.(e.pointerId); armDrag(e, k, p.d, c); };
       return c;
     }), add);
