@@ -1,6 +1,6 @@
 {
-  "versionCode": 14,
-  "versionName": "3.2",
-  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.2/posudomoyka.apk",
-  "notes": "Блюда дня по порядку категорий. Нажмите на блюдо — присоединитесь к выбору. Подержите блюдо — перетащите на другой день."
+  "versionCode": 15,
+  "versionName": "3.3",
+  "url": "https://github.com/fggtf24-cyber/posudomoyka/releases/download/v3.3/posudomoyka.apk",
+  "notes": "Длинные плашки блюд переносятся аккуратно, крестик не пропадает. Отступ у кнопки «Готово» в блоке «Сегодня»."
 }
