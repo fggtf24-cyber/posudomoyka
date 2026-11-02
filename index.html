@@ -142,6 +142,7 @@ button.pick.own { --c: var(--stone); }
 .day.drop { background: var(--sand); border-radius: 12px; }
 .chips.ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; transform: scale(1.06); filter: drop-shadow(0 6px 10px rgba(17, 17, 17, .25)); }
 .chips span.dragging { opacity: .3; }
+.chips button.sure { color: var(--ink); font-size: .8rem; text-decoration: underline; text-underline-offset: 2px; }
 .chips span small { margin-left: 6px; color: var(--grey); font-size: .74rem; letter-spacing: .04em; }
 #who .chips, #who .add { margin-top: 0; }
 button.linkbtn { background: none; border: 0; padding: 0; font: inherit; letter-spacing: 0; text-transform: none; color: var(--ink);
@@ -523,7 +524,12 @@ const sortPicks = list => [...list].sort((a, b) => dishOrder(a.d) - dishOrder(b.
 
 function chip(text, onRemove, note, color, join) {
   const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.ariaLabel = "Убрать " + text;
-  x.onclick = onRemove;
+  // удаление в два нажатия: × превращается в «удалить?», через 3 секунды без ответа — обратно
+  x.onclick = () => {
+    if (x.classList.contains("sure")) return onRemove();
+    x.classList.add("sure"); x.textContent = "удалить?";
+    setTimeout(() => { x.classList.remove("sure"); x.textContent = "×"; }, 3000);
+  };
   const c = document.createElement("span");
   // join — нажатие на само блюдо: {label, onclick, disabled}
   const body = join ? el("button", { type: "button", className: "join", ariaLabel: join.label, disabled: join.disabled }, text) : c;
